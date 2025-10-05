@@ -5,7 +5,6 @@
 [![Linebender Zulip, #kurbo channel](https://img.shields.io/badge/Linebender-grey?logo=Zulip)](https://xi.zulipchat.com)
 [![dependency status](https://deps.rs/repo/github/dioxuslabs/anyrender/status.svg)](https://deps.rs/repo/github/dioxuslabs/anyrender)
 [![Apache 2.0 or MIT license.](https://img.shields.io/badge/license-Apache--2.0_OR_MIT-blue.svg)](#license)
-[![Build status](https://github.com/dioxuslabs/anyrender/workflows/CI/badge.svg)](https://github.com/dioxuslabs/anyrender/actions)
 [![Crates.io](https://img.shields.io/crates/v/anyrender.svg)](https://crates.io/crates/anyrender)
 [![Docs](https://docs.rs/anyrender/badge.svg)](https://docs.rs/anyrender)
 
