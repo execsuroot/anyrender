@@ -1,0 +1,55 @@
+[workspace]
+members = [
+  "packages/anyrender",
+  "packages/anyrender_vello",
+  "packages/anyrender_vello_cpu",
+  "packages/anyrender_svg",
+  "packages/wgpu_context",
+  "examples/anyrender",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.6.0"
+license = "MIT OR Apache-2.0"
+homepage = "https://github.com/dioxuslabs/anyrender"
+repository = "https://github.com/dioxuslabs/anyrender"
+categories = ["gui"]
+edition = "2024"
+rust-version = "1.86.0"
+
+[workspace.dependencies]
+# Anyrender dependencies(in-repo)
+anyrender = { version = "0.5.0", path = "./packages/anyrender" }
+anyrender_vello = { version = "0.5.1", path = "./packages/anyrender_vello" }
+anyrender_vello_cpu = { version = "0.6.0", path = "./packages/anyrender_vello_cpu" }
+anyrender_svg = { version = "0.5.0", path = "./packages/anyrender_svg" }
+wgpu_context = { version = "0.1.0", path = "./packages/wgpu_context" }
+
+# Linebender
+color = "0.3"
+linebender_resource_handle = "0.1"
+peniko = "0.5.0"
+kurbo = "0.12"
+vello = { version = "0.6", features = [ "wgpu" ] }
+vello_cpu = { version = "0.0.3", default-features = false, features = ["std", "text"]}
+
+# Rendering
+wgpu = "26"
+raw-window-handle = "0.6.0"
+softbuffer = "0.4"
+pixels = "0.15"
+
+# SVG
+usvg = "0.45.1"
+image = { version = "0.25", default-features = false }
+
+# Other dependencies
+debug_timer = "0.1.1"
+rustc-hash = "1.1.0"
+futures-util = "0.3.30"
+futures-intrusive = "0.5.0"
+pollster = "0.4"
+
+# Dev-dependencies
+winit = { version = "0.30.2", features = ["rwh_06"] }
