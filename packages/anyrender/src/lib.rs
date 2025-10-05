@@ -3,7 +3,7 @@
 //!
 //! ### Painting a scene
 //!
-//! The core abstraction in Anyrenderis the [`PaintScene`] trait.
+//! The core abstraction in AnyRender is the [`PaintScene`] trait.
 //!
 //! [`PaintScene`] is a "sink" which accepts drawing commands:
 //!
@@ -19,7 +19,7 @@
 //!
 //! ### SVG
 //!
-//! The [anyrender_svg](https://docs.rs/anyrender_svg) crate allows SVGs to be rendered using Anyrender
+//! The [anyrender_svg](https://docs.rs/anyrender_svg) crate allows SVGs to be rendered using AnyRender
 //!
 //! ### Backends
 //!
