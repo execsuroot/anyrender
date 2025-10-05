@@ -89,19 +89,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "anyrender_example"
-version = "0.1.0"
-dependencies = [
- "anyrender",
- "anyrender_vello",
- "anyrender_vello_cpu",
- "kurbo 0.12.0",
- "peniko",
- "wgpu 26.0.1",
- "winit",
-]
-
-[[package]]
 name = "anyrender_svg"
 version = "0.5.0"
 dependencies = [
@@ -3569,6 +3556,19 @@ dependencies = [
  "x11-dl",
  "x11rb",
  "xkbcommon-dl",
+]
+
+[[package]]
+name = "winit-example"
+version = "0.1.0"
+dependencies = [
+ "anyrender",
+ "anyrender_vello",
+ "anyrender_vello_cpu",
+ "kurbo 0.12.0",
+ "peniko",
+ "wgpu 26.0.1",
+ "winit",
 ]
 
 [[package]]

@@ -5,7 +5,7 @@ members = [
   "packages/anyrender_vello_cpu",
   "packages/anyrender_svg",
   "packages/wgpu_context",
-  "examples/anyrender",
+  "examples/winit",
 ]
 resolver = "2"
 
