@@ -99,7 +99,7 @@ impl<Renderer: ImageRenderer> WindowRenderer for PixelsWindowRenderer<Renderer> 
 
         state.pixels.render().unwrap();
         timer.record_time("present");
-        timer.print_times("Frame time: ");
+        timer.print_times("pixels: ");
 
         // Reset the renderer ready for the next render
         self.renderer.reset();

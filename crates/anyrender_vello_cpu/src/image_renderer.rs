@@ -1,5 +1,6 @@
 use crate::VelloCpuScenePainter;
 use anyrender::ImageRenderer;
+use debug_timer::debug_timer;
 use vello_cpu::{RenderContext, RenderMode};
 
 pub struct VelloCpuImageRenderer {
@@ -24,13 +25,23 @@ impl ImageRenderer for VelloCpuImageRenderer {
     }
 
     fn render<F: FnOnce(&mut Self::ScenePainter<'_>)>(&mut self, draw_fn: F, buffer: &mut [u8]) {
-        let width = self.scene.0.width();
-        let height = self.scene.0.height();
+        debug_timer!(timer, feature = "log_frame_times");
+
         draw_fn(&mut self.scene);
+        timer.record_time("cmds");
+
         self.scene.0.flush();
-        self.scene
-            .0
-            .render_to_buffer(buffer, width, height, RenderMode::OptimizeSpeed);
+        timer.record_time("flush");
+
+        self.scene.0.render_to_buffer(
+            buffer,
+            self.scene.0.width(),
+            self.scene.0.height(),
+            RenderMode::OptimizeSpeed,
+        );
+        timer.record_time("render");
+
+        timer.print_times("vello_cpu: ");
     }
 
     fn render_to_vec<F: FnOnce(&mut Self::ScenePainter<'_>)>(

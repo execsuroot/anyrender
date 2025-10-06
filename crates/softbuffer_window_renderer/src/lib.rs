@@ -117,7 +117,7 @@ impl<Renderer: ImageRenderer> WindowRenderer for SoftbufferWindowRenderer<Render
 
         surface_buffer.present().unwrap();
         timer.record_time("present");
-        timer.print_times("Frame time: ");
+        timer.print_times("softbuffer: ");
 
         // Reset the renderer ready for the next render
         self.renderer.reset();
