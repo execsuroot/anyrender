@@ -1,7 +1,7 @@
 use peniko::ImageData;
 use vello::Renderer as VelloRenderer;
 use wgpu::Texture;
-use wgpu_context::DeviceHandle;
+pub use wgpu_context::DeviceHandle;
 
 pub trait CustomPaintSource: 'static {
     fn resume(&mut self, device_handle: &DeviceHandle);
