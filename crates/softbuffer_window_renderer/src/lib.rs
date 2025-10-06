@@ -1,10 +1,11 @@
-use crate::VelloCpuScenePainter;
-use anyrender::{WindowHandle, WindowRenderer};
+//! An AnyRender WindowRenderer for rendering pixel buffers using the softbuffer crate
+
+#![cfg_attr(docsrs, feature(doc_cfg))]
+
+use anyrender::{ImageRenderer, WindowHandle, WindowRenderer};
 use debug_timer::debug_timer;
-use peniko::color::PremulRgba8;
 use softbuffer::{Context, Surface};
 use std::{num::NonZero, sync::Arc};
-use vello_cpu::{Pixmap, RenderContext};
 
 // Simple struct to hold the state of the renderer
 pub struct ActiveRenderState {
@@ -18,27 +19,34 @@ pub enum RenderState {
     Suspended,
 }
 
-pub struct VelloCpuSoftbufferWindowRenderer {
+pub struct SoftbufferWindowRenderer<Renderer: ImageRenderer> {
     // The fields MUST be in this order, so that the surface is dropped before the window
     // Window is cached even when suspended so that it can be reused when the app is resumed after being suspended
     render_state: RenderState,
     window_handle: Option<Arc<dyn WindowHandle>>,
-    render_context: VelloCpuScenePainter,
+    renderer: Renderer,
 }
 
-impl VelloCpuSoftbufferWindowRenderer {
+impl<Renderer: ImageRenderer> SoftbufferWindowRenderer<Renderer> {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
-        Self {
+        Self::with_renderer(Renderer::new(0, 0))
+    }
+
+    pub fn with_renderer<R: ImageRenderer>(renderer: R) -> SoftbufferWindowRenderer<R> {
+        SoftbufferWindowRenderer {
             render_state: RenderState::Suspended,
             window_handle: None,
-            render_context: VelloCpuScenePainter(RenderContext::new(0, 0)),
+            renderer,
         }
     }
 }
 
-impl WindowRenderer for VelloCpuSoftbufferWindowRenderer {
-    type ScenePainter<'a> = VelloCpuScenePainter;
+impl<Renderer: ImageRenderer> WindowRenderer for SoftbufferWindowRenderer<Renderer> {
+    type ScenePainter<'a>
+        = Renderer::ScenePainter<'a>
+    where
+        Self: 'a;
 
     fn is_active(&self) -> bool {
         matches!(self.render_state, RenderState::Active(_))
@@ -69,14 +77,11 @@ impl WindowRenderer for VelloCpuSoftbufferWindowRenderer {
                     NonZero::new(physical_height.max(1)).unwrap(),
                 )
                 .unwrap();
-            self.render_context = VelloCpuScenePainter(RenderContext::new(
-                physical_width as u16,
-                physical_height as u16,
-            ));
+            self.renderer.resize(physical_width, physical_height);
         };
     }
 
-    fn render<F: FnOnce(&mut Self::ScenePainter<'_>)>(&mut self, draw_fn: F) {
+    fn render<F: FnOnce(&mut Renderer::ScenePainter<'_>)>(&mut self, draw_fn: F) {
         let RenderState::Active(state) = &mut self.render_state else {
             return;
         };
@@ -89,22 +94,19 @@ impl WindowRenderer for VelloCpuSoftbufferWindowRenderer {
         timer.record_time("buffer_mut");
 
         // Paint
-        let width = self.render_context.0.width();
-        let height = self.render_context.0.height();
-        let mut pixmap = Pixmap::new(width, height);
-        draw_fn(&mut self.render_context);
-        timer.record_time("cmd");
-
-        self.render_context.0.flush();
-        timer.record_time("flush");
-
-        self.render_context.0.render_to_pixmap(&mut pixmap);
+        let mut vec = Vec::new();
+        self.renderer.render_to_vec(draw_fn, &mut vec);
         timer.record_time("render");
 
         let out = surface_buffer.as_mut();
-        assert_eq!(pixmap.data().len(), out.len());
-        for (src, dest) in pixmap.data().iter().zip(out.iter_mut()) {
-            let PremulRgba8 { r, g, b, a } = *src;
+
+        // TODO: replace chunk_exacts with as_chunks once MSRV hits 1.88
+        let chunks = vec.chunks_exact(4);
+        assert_eq!(chunks.size_hint().0, out.len());
+        assert_eq!(chunks.remainder().len(), 0);
+
+        for (src, dest) in chunks.zip(out.iter_mut()) {
+            let [r, g, b, a]: [u8; 4] = src.try_into().unwrap();
             if a == 0 {
                 *dest = u32::MAX;
             } else {
@@ -117,7 +119,7 @@ impl WindowRenderer for VelloCpuSoftbufferWindowRenderer {
         timer.record_time("present");
         timer.print_times("Frame time: ");
 
-        // Empty the Vello render context (memory optimisation)
-        self.render_context.0.reset();
+        // Reset the renderer ready for the next render
+        self.renderer.reset();
     }
 }
