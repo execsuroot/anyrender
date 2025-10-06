@@ -2,11 +2,11 @@
 name = "anyrender"
 description = "2D Canvas abstraction"
 version = "0.5.0"
-homepage = "https://github.com/dioxuslabs/blitz"
-repository = "https://github.com/dioxuslabs/blitz"
 documentation = "https://docs.rs/anyrender"
+homepage.workspace = true
+repository.workspace = true
 license.workspace = true
-edition = "2024"
+edition.workspace = true
 
 [dependencies]
 kurbo = { workspace = true }

@@ -2,11 +2,11 @@
 name = "anyrender_vello"
 description = "Vello backend for anyrender"
 version = "0.5.2"
-homepage = "https://github.com/dioxuslabs/blitz"
-repository = "https://github.com/dioxuslabs/blitz"
 documentation = "https://docs.rs/anyrender_vello"
+homepage.workspace = true
+repository.workspace = true
 license.workspace = true
-edition = "2024"
+edition.workspace = true
 
 [features]
 log_frame_times = ["debug_timer/enable"]
