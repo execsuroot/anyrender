@@ -6,14 +6,28 @@ use vello::Renderer as VelloRenderer;
 
 use crate::{CustomPaintSource, custom_paint_source::CustomPaintCtx};
 
-pub struct VelloScenePainter<'r> {
-    pub renderer: &'r mut VelloRenderer,
-    pub custom_paint_sources: &'r mut FxHashMap<u64, Box<dyn CustomPaintSource>>,
-    pub inner: vello::Scene,
+pub struct VelloScenePainter<'r, 's> {
+    pub(crate) renderer: Option<&'r mut VelloRenderer>,
+    pub(crate) custom_paint_sources: Option<&'r mut FxHashMap<u64, Box<dyn CustomPaintSource>>>,
+    pub(crate) inner: &'s mut vello::Scene,
 }
 
-impl VelloScenePainter<'_> {
+impl VelloScenePainter<'_, '_> {
+    pub fn new<'s>(scene: &'s mut vello::Scene) -> VelloScenePainter<'static, 's> {
+        VelloScenePainter {
+            renderer: None,
+            custom_paint_sources: None,
+            inner: scene,
+        }
+    }
+
     fn render_custom_source(&mut self, custom_paint: CustomPaint) -> Option<peniko::ImageBrush> {
+        let (Some(renderer), Some(custom_paint_sources)) =
+            (&mut self.renderer, &mut self.custom_paint_sources)
+        else {
+            return None;
+        };
+
         let CustomPaint {
             source_id,
             width,
@@ -22,8 +36,8 @@ impl VelloScenePainter<'_> {
         } = custom_paint;
 
         // Render custom paint source
-        let source = self.custom_paint_sources.get_mut(&source_id)?;
-        let ctx = CustomPaintCtx::new(self.renderer);
+        let source = custom_paint_sources.get_mut(&source_id)?;
+        let ctx = CustomPaintCtx::new(renderer);
         let texture_handle = source.render(ctx, width, height, scale)?;
 
         // Return dummy image
@@ -31,13 +45,7 @@ impl VelloScenePainter<'_> {
     }
 }
 
-impl VelloScenePainter<'_> {
-    pub fn finish(self) -> vello::Scene {
-        self.inner
-    }
-}
-
-impl PaintScene for VelloScenePainter<'_> {
+impl PaintScene for VelloScenePainter<'_, '_> {
     fn reset(&mut self) {
         self.inner.reset();
     }

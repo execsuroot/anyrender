@@ -67,7 +67,7 @@ pub struct VelloWindowRenderer {
 
     // Vello
     wgpu_context: WGPUContext,
-    scene: Option<VelloScene>,
+    scene: VelloScene,
     config: VelloRendererOptions,
 
     custom_paint_sources: FxHashMap<u64, Box<dyn CustomPaintSource>>,
@@ -90,7 +90,7 @@ impl VelloWindowRenderer {
             config,
             render_state: RenderState::Suspended,
             window_handle: None,
-            scene: Some(VelloScene::new()),
+            scene: VelloScene::new(),
             custom_paint_sources: FxHashMap::default(),
         }
     }
@@ -119,7 +119,7 @@ impl VelloWindowRenderer {
 
 impl WindowRenderer for VelloWindowRenderer {
     type ScenePainter<'a>
-        = VelloScenePainter<'a>
+        = VelloScenePainter<'a, 'a>
     where
         Self: 'a;
 
@@ -200,13 +200,11 @@ impl WindowRenderer for VelloWindowRenderer {
         debug_timer!(timer, feature = "log_frame_times");
 
         // Regenerate the vello scene
-        let mut scene = VelloScenePainter {
-            inner: self.scene.take().unwrap(),
-            renderer: &mut state.renderer,
-            custom_paint_sources: &mut self.custom_paint_sources,
-        };
-        draw_fn(&mut scene);
-        self.scene = Some(scene.finish());
+        draw_fn(&mut VelloScenePainter {
+            inner: &mut self.scene,
+            renderer: Some(&mut state.renderer),
+            custom_paint_sources: Some(&mut self.custom_paint_sources),
+        });
         timer.record_time("cmd");
 
         state
@@ -214,7 +212,7 @@ impl WindowRenderer for VelloWindowRenderer {
             .render_to_texture(
                 render_surface.device(),
                 render_surface.queue(),
-                self.scene.as_ref().unwrap(),
+                &self.scene,
                 &render_surface.target_texture_view(),
                 &RenderParams {
                     base_color: self.config.base_color,
@@ -238,6 +236,6 @@ impl WindowRenderer for VelloWindowRenderer {
         // println!("FRAME {}", COUNTER.fetch_add(1, atomic::Ordering::Relaxed));
 
         // Empty the Vello scene (memory optimisation)
-        self.scene.as_mut().unwrap().reset();
+        self.scene.reset();
     }
 }

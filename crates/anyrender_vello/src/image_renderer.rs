@@ -9,15 +9,12 @@ use crate::{DEFAULT_THREADS, VelloScenePainter};
 pub struct VelloImageRenderer {
     buffer_renderer: BufferRenderer,
     vello_renderer: VelloRenderer,
-
-    // scene is always Some except temporarily during when it is moved out
-    // to keep the borrow-checker happy.
-    scene: Option<VelloScene>,
+    scene: VelloScene,
 }
 
 impl ImageRenderer for VelloImageRenderer {
     type ScenePainter<'a>
-        = VelloScenePainter<'a>
+        = VelloScenePainter<'a, 'a>
     where
         Self: 'a;
 
@@ -49,7 +46,7 @@ impl ImageRenderer for VelloImageRenderer {
         Self {
             buffer_renderer,
             vello_renderer,
-            scene: Some(VelloScene::new()),
+            scene: VelloScene::new(),
         }
     }
 
@@ -58,9 +55,7 @@ impl ImageRenderer for VelloImageRenderer {
     }
 
     fn reset(&mut self) {
-        if let Some(scene) = &mut self.scene {
-            scene.reset();
-        }
+        self.scene.reset();
     }
 
     fn render_to_vec<F: FnOnce(&mut Self::ScenePainter<'_>)>(
@@ -79,20 +74,18 @@ impl ImageRenderer for VelloImageRenderer {
         draw_fn: F,
         cpu_buffer: &mut [u8],
     ) {
-        let mut scene = VelloScenePainter {
-            inner: self.scene.take().unwrap(),
-            renderer: &mut self.vello_renderer,
-            custom_paint_sources: &mut FxHashMap::default(),
-        };
-        draw_fn(&mut scene);
-        self.scene = Some(scene.finish());
+        draw_fn(&mut VelloScenePainter {
+            inner: &mut self.scene,
+            renderer: Some(&mut self.vello_renderer),
+            custom_paint_sources: Some(&mut FxHashMap::default()),
+        });
 
         let size = self.buffer_renderer.size();
         self.vello_renderer
             .render_to_texture(
                 self.buffer_renderer.device(),
                 self.buffer_renderer.queue(),
-                self.scene.as_ref().unwrap(),
+                &self.scene,
                 &self.buffer_renderer.target_texture_view(),
                 &vello::RenderParams {
                     base_color: vello::peniko::Color::TRANSPARENT,
@@ -106,6 +99,6 @@ impl ImageRenderer for VelloImageRenderer {
         self.buffer_renderer.copy_texture_to_buffer(cpu_buffer);
 
         // Empty the Vello scene (memory optimisation)
-        self.scene.as_mut().unwrap().reset();
+        self.scene.reset();
     }
 }
