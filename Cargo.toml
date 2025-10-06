@@ -1,10 +1,10 @@
 [workspace]
 members = [
-  "packages/anyrender",
-  "packages/anyrender_vello",
-  "packages/anyrender_vello_cpu",
-  "packages/anyrender_svg",
-  "packages/wgpu_context",
+  "crates/anyrender",
+  "crates/anyrender_vello",
+  "crates/anyrender_vello_cpu",
+  "crates/anyrender_svg",
+  "crates/wgpu_context",
   "examples/winit",
 ]
 resolver = "2"
@@ -20,11 +20,11 @@ rust-version = "1.86.0"
 
 [workspace.dependencies]
 # Anyrender dependencies(in-repo)
-anyrender = { version = "0.5.0", path = "./packages/anyrender" }
-anyrender_vello = { version = "0.5.1", path = "./packages/anyrender_vello" }
-anyrender_vello_cpu = { version = "0.6.0", path = "./packages/anyrender_vello_cpu" }
-anyrender_svg = { version = "0.5.0", path = "./packages/anyrender_svg" }
-wgpu_context = { version = "0.1.0", path = "./packages/wgpu_context" }
+anyrender = { version = "0.5.0", path = "./crates/anyrender" }
+anyrender_vello = { version = "0.5.1", path = "./crates/anyrender_vello" }
+anyrender_vello_cpu = { version = "0.6.0", path = "./crates/anyrender_vello_cpu" }
+anyrender_svg = { version = "0.5.0", path = "./crates/anyrender_svg" }
+wgpu_context = { version = "0.1.0", path = "./crates/wgpu_context" }
 
 # Linebender
 color = "0.3"
