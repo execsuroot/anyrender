@@ -1,4 +1,4 @@
-use anyrender::{CustomPaint, NormalizedCoord, Paint, PaintScene};
+use anyrender::{CustomPaint, NormalizedCoord, Paint, PaintRef, PaintScene};
 use kurbo::{Affine, Rect, Shape, Stroke};
 use peniko::{BlendMode, BrushRef, Color, Fill, FontData, ImageBrush, StyleRef};
 use rustc_hash::FxHashMap;
@@ -60,23 +60,25 @@ impl PaintScene for VelloScenePainter<'_> {
         &mut self,
         style: &Stroke,
         transform: Affine,
-        brush: impl Into<BrushRef<'a>>,
+        paint_ref: impl Into<PaintRef<'a>>,
         brush_transform: Option<Affine>,
         shape: &impl Shape,
     ) {
+        let paint_ref: PaintRef<'_> = paint_ref.into();
+        let brush_ref: BrushRef<'_> = paint_ref.into();
         self.inner
-            .stroke(style, transform, brush, brush_transform, shape);
+            .stroke(style, transform, brush_ref, brush_transform, shape);
     }
 
     fn fill<'a>(
         &mut self,
         style: Fill,
         transform: Affine,
-        paint: impl Into<Paint<'a>>,
+        paint: impl Into<PaintRef<'a>>,
         brush_transform: Option<Affine>,
         shape: &impl Shape,
     ) {
-        let paint: Paint<'_> = paint.into();
+        let paint: PaintRef<'_> = paint.into();
 
         let dummy_image: peniko::ImageBrush;
         let brush_ref: BrushRef<'_> = match paint {
@@ -84,7 +86,7 @@ impl PaintScene for VelloScenePainter<'_> {
             Paint::Gradient(gradient) => BrushRef::Gradient(gradient),
             Paint::Image(image) => BrushRef::Image(image),
             Paint::Custom(custom_paint) => {
-                let Ok(custom_paint) = custom_paint.downcast::<CustomPaint>() else {
+                let Some(custom_paint) = custom_paint.downcast_ref::<CustomPaint>() else {
                     return;
                 };
                 let Some(image) = self.render_custom_source(*custom_paint) else {
@@ -106,7 +108,7 @@ impl PaintScene for VelloScenePainter<'_> {
         hint: bool,
         normalized_coords: &'a [NormalizedCoord],
         style: impl Into<StyleRef<'a>>,
-        brush: impl Into<BrushRef<'a>>,
+        paint: impl Into<PaintRef<'a>>,
         brush_alpha: f32,
         transform: Affine,
         glyph_transform: Option<Affine>,
@@ -117,7 +119,7 @@ impl PaintScene for VelloScenePainter<'_> {
             .font_size(font_size)
             .hint(hint)
             .normalized_coords(normalized_coords)
-            .brush(brush)
+            .brush(paint.into())
             .brush_alpha(brush_alpha)
             .transform(transform)
             .glyph_transform(glyph_transform)

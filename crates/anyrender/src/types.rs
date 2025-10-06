@@ -1,6 +1,6 @@
 //! Types that are used within the Anyrender traits
 
-use peniko::{BrushRef, Color, Gradient, ImageBrushRef};
+use peniko::{Brush, BrushRef, Color, Gradient, ImageBrush, ImageBrushRef};
 use std::{any::Any, sync::Arc};
 
 pub type NormalizedCoord = i16;
@@ -22,42 +22,89 @@ pub struct CustomPaint {
 }
 
 #[derive(Clone, Debug)]
-pub enum Paint<'a> {
+pub enum Paint<I = ImageBrush, G = Gradient, C = Arc<dyn Any + Send + Sync>> {
     /// Solid color brush.
     Solid(Color),
     /// Gradient brush.
-    Gradient(&'a Gradient),
+    Gradient(G),
     /// Image brush.
-    Image(ImageBrushRef<'a>),
+    Image(I),
     /// Custom paint (type erased as each backend will have their own)
-    Custom(Arc<dyn Any + Send + Sync>),
+    Custom(C),
 }
-impl From<Color> for Paint<'_> {
+
+pub type PaintRef<'a> = Paint<ImageBrushRef<'a>, &'a Gradient, &'a (dyn Any + Send + Sync)>;
+
+impl Paint {
+    pub fn as_ref(&self) -> PaintRef<'_> {
+        match self {
+            Paint::Solid(color) => Paint::Solid(*color),
+            Paint::Gradient(gradient) => Paint::Gradient(gradient),
+            Paint::Image(image) => Paint::Image(image.as_ref()),
+
+            // Custom paints are translated into "invisible" where they are not supported
+            Paint::Custom(custom) => Paint::Custom(custom.as_ref()),
+        }
+    }
+}
+
+impl<'a> From<&'a Paint> for PaintRef<'a> {
+    fn from(paint: &'a Paint) -> Self {
+        paint.as_ref()
+    }
+}
+
+impl<'a> From<PaintRef<'a>> for BrushRef<'a> {
+    fn from(value: PaintRef<'a>) -> Self {
+        match value {
+            Paint::Solid(color) => Brush::Solid(color),
+            Paint::Gradient(gradient) => Brush::Gradient(gradient),
+            Paint::Image(image) => Brush::Image(image),
+
+            // Custom paints are translated into "invisible" where they are not supported
+            Paint::Custom(_) => Brush::Solid(Color::TRANSPARENT),
+        }
+    }
+}
+
+// #[derive(Clone, Debug)]
+// pub enum PaintRef<'a> {
+//     /// Solid color brush.
+//     Solid(Color),
+//     /// Gradient brush.
+//     Gradient(&'a Gradient),
+//     /// Image brush.
+//     Image(ImageBrushRef<'a>),
+//     /// Custom paint (type erased as each backend will have their own)
+//     Custom(Arc<dyn Any + Send + Sync>),
+// }
+
+impl<I, G, C> From<Color> for Paint<I, G, C> {
     fn from(value: Color) -> Self {
         Paint::Solid(value)
     }
 }
-impl<'a> From<&'a Gradient> for Paint<'a> {
+impl<'a, I, C> From<&'a Gradient> for Paint<I, &'a Gradient, C> {
     fn from(value: &'a Gradient) -> Self {
         Paint::Gradient(value)
     }
 }
-impl<'a> From<ImageBrushRef<'a>> for Paint<'a> {
+impl<'a, G, C> From<ImageBrushRef<'a>> for Paint<ImageBrushRef<'a>, G, C> {
     fn from(value: ImageBrushRef<'a>) -> Self {
         Paint::Image(value)
     }
 }
-impl<'a> From<Arc<dyn Any + Send + Sync>> for Paint<'a> {
+impl<I, G> From<Arc<dyn Any + Send + Sync>> for Paint<I, G, Arc<dyn Any + Send + Sync>> {
     fn from(value: Arc<dyn Any + Send + Sync>) -> Self {
         Paint::Custom(value)
     }
 }
-impl<'a> From<BrushRef<'a>> for Paint<'a> {
+impl<'a> From<BrushRef<'a>> for PaintRef<'a> {
     fn from(value: BrushRef<'a>) -> Self {
         match value {
-            BrushRef::Solid(color) => Paint::Solid(color),
-            BrushRef::Gradient(gradient) => Paint::Gradient(gradient),
-            BrushRef::Image(image) => Paint::Image(image),
+            BrushRef::Solid(color) => PaintRef::Solid(color),
+            BrushRef::Gradient(gradient) => PaintRef::Gradient(gradient),
+            BrushRef::Image(image) => PaintRef::Image(image),
         }
     }
 }

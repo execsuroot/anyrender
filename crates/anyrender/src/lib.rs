@@ -28,7 +28,7 @@
 //!  - [anyrender_vello_cpu](https://docs.rs/anyrender_vello_cpu)
 
 use kurbo::{Affine, Rect, Shape, Stroke};
-use peniko::{BlendMode, BrushRef, Color, Fill, FontData, ImageBrushRef, StyleRef};
+use peniko::{BlendMode, Color, Fill, FontData, ImageBrushRef, StyleRef};
 use std::sync::Arc;
 
 pub mod wasm_send_sync;
@@ -101,7 +101,7 @@ pub trait PaintScene {
         &mut self,
         style: &Stroke,
         transform: Affine,
-        brush: impl Into<BrushRef<'a>>,
+        brush: impl Into<PaintRef<'a>>,
         brush_transform: Option<Affine>,
         shape: &impl Shape,
     );
@@ -111,7 +111,7 @@ pub trait PaintScene {
         &mut self,
         style: Fill,
         transform: Affine,
-        brush: impl Into<Paint<'a>>,
+        brush: impl Into<PaintRef<'a>>,
         brush_transform: Option<Affine>,
         shape: &impl Shape,
     );
@@ -125,7 +125,7 @@ pub trait PaintScene {
         hint: bool,
         normalized_coords: &'a [NormalizedCoord],
         style: impl Into<StyleRef<'a>>,
-        brush: impl Into<BrushRef<'a>>,
+        brush: impl Into<PaintRef<'a>>,
         brush_alpha: f32,
         transform: Affine,
         glyph_transform: Option<Affine>,

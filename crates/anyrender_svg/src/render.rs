@@ -4,7 +4,7 @@
 use crate::util;
 use anyrender::PaintScene;
 use kurbo::{Affine, BezPath};
-use peniko::{BlendMode, BrushRef, Fill};
+use peniko::{BlendMode, Fill};
 use usvg::{Node, Path};
 
 pub(crate) fn render_group<S: PaintScene, F: FnMut(&mut S, &usvg::Node)>(
@@ -152,14 +152,14 @@ fn fill<S: PaintScene, F: FnMut(&mut S, &usvg::Node)>(
     node: &Node,
 ) {
     if let Some(fill) = &path.fill() {
-        if let Some((brush, brush_transform)) = util::to_brush(fill.paint(), fill.opacity()) {
+        if let Some((paint, brush_transform)) = util::to_brush(fill.paint(), fill.opacity()) {
             scene.fill(
                 match fill.rule() {
                     usvg::FillRule::NonZero => Fill::NonZero,
                     usvg::FillRule::EvenOdd => Fill::EvenOdd,
                 },
                 transform,
-                BrushRef::from(&brush),
+                paint.as_ref(),
                 Some(brush_transform),
                 local_path,
             );
@@ -178,12 +178,12 @@ fn stroke<S: PaintScene, F: FnMut(&mut S, &usvg::Node)>(
     node: &Node,
 ) {
     if let Some(stroke) = &path.stroke() {
-        if let Some((brush, brush_transform)) = util::to_brush(stroke.paint(), stroke.opacity()) {
+        if let Some((paint, brush_transform)) = util::to_brush(stroke.paint(), stroke.opacity()) {
             let conv_stroke = util::to_stroke(stroke);
             scene.stroke(
                 &conv_stroke,
                 transform,
-                &brush,
+                paint.as_ref(),
                 Some(brush_transform),
                 local_path,
             );

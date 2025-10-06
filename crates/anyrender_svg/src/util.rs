@@ -1,10 +1,10 @@
 // Copyright 2023 the Vello Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use anyrender::PaintScene;
+use anyrender::{Paint, PaintScene};
 use kurbo::{Affine, BezPath, Point, Rect, Stroke};
 use peniko::color::{self, DynamicColor};
-use peniko::{Brush, Color, Fill, Mix};
+use peniko::{Color, Fill, Mix};
 
 #[cfg(feature = "image")]
 use peniko::{Blob, ImageBrush};
@@ -136,10 +136,10 @@ pub(crate) fn into_image(image: image::ImageBuffer<image::Rgba<u8>, Vec<u8>>) ->
     })
 }
 
-pub(crate) fn to_brush(paint: &usvg::Paint, opacity: usvg::Opacity) -> Option<(Brush, Affine)> {
+pub(crate) fn to_brush(paint: &usvg::Paint, opacity: usvg::Opacity) -> Option<(Paint, Affine)> {
     match paint {
         usvg::Paint::Color(color) => Some((
-            Brush::Solid(Color::from_rgba8(
+            Paint::Solid(Color::from_rgba8(
                 color.red,
                 color.green,
                 color.blue,
@@ -174,7 +174,7 @@ pub(crate) fn to_brush(paint: &usvg::Paint, opacity: usvg::Opacity) -> Option<(B
             .map(f64::from);
             let transform = Affine::new(arr);
             let gradient = peniko::Gradient::new_linear(start, end).with_stops(stops.as_slice());
-            Some((Brush::Gradient(gradient), transform))
+            Some((Paint::Gradient(gradient), transform))
         }
         usvg::Paint::RadialGradient(gr) => {
             let stops: Vec<peniko::ColorStop> = gr
@@ -212,7 +212,7 @@ pub(crate) fn to_brush(paint: &usvg::Paint, opacity: usvg::Opacity) -> Option<(B
                 end_radius,
             )
             .with_stops(stops.as_slice());
-            Some((Brush::Gradient(gradient), transform))
+            Some((Paint::Gradient(gradient), transform))
         }
         usvg::Paint::Pattern(_) => None,
     }

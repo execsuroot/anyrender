@@ -1,22 +1,11 @@
-use anyrender::{NormalizedCoord, Paint, PaintScene};
+use anyrender::{NormalizedCoord, Paint, PaintRef, PaintScene};
 use kurbo::{Affine, Rect, Shape, Stroke};
-use peniko::{BlendMode, Brush, BrushRef, Color, Fill, FontData, ImageBrush, ImageData, StyleRef};
+use peniko::{BlendMode, Color, Fill, FontData, ImageBrush, ImageData, StyleRef};
 use vello_cpu::{ImageSource, PaintType, Pixmap};
 
 const DEFAULT_TOLERANCE: f64 = 0.1;
 
-fn brush_ref_to_paint_type<'a>(brush_ref: BrushRef<'a>) -> PaintType {
-    match brush_ref {
-        Brush::Solid(alpha_color) => PaintType::Solid(alpha_color),
-        Brush::Gradient(gradient) => PaintType::Gradient(gradient.clone()),
-        Brush::Image(image) => PaintType::Image(ImageBrush {
-            image: ImageSource::from_peniko_image_data(image.image),
-            sampler: image.sampler,
-        }),
-    }
-}
-
-fn anyrender_paint_to_vello_cpu_paint<'a>(paint: Paint<'a>) -> PaintType {
+fn anyrender_paint_to_vello_cpu_paint<'a>(paint: PaintRef<'a>) -> PaintType {
     match paint {
         Paint::Solid(alpha_color) => PaintType::Solid(alpha_color),
         Paint::Gradient(gradient) => PaintType::Gradient(gradient.clone()),
@@ -82,13 +71,14 @@ impl PaintScene for VelloCpuScenePainter {
         &mut self,
         style: &Stroke,
         transform: Affine,
-        brush: impl Into<BrushRef<'a>>,
+        paint: impl Into<PaintRef<'a>>,
         brush_transform: Option<Affine>,
         shape: &impl Shape,
     ) {
         self.0.set_transform(transform);
         self.0.set_stroke(style.clone());
-        self.0.set_paint(brush_ref_to_paint_type(brush.into()));
+        self.0
+            .set_paint(anyrender_paint_to_vello_cpu_paint(paint.into()));
         self.0
             .set_paint_transform(brush_transform.unwrap_or(Affine::IDENTITY));
         self.0.stroke_path(&shape.into_path(DEFAULT_TOLERANCE));
@@ -98,14 +88,14 @@ impl PaintScene for VelloCpuScenePainter {
         &mut self,
         style: Fill,
         transform: Affine,
-        brush: impl Into<Paint<'a>>,
+        paint: impl Into<PaintRef<'a>>,
         brush_transform: Option<Affine>,
         shape: &impl Shape,
     ) {
         self.0.set_transform(transform);
         self.0.set_fill_rule(style);
         self.0
-            .set_paint(anyrender_paint_to_vello_cpu_paint(brush.into()));
+            .set_paint(anyrender_paint_to_vello_cpu_paint(paint.into()));
         self.0
             .set_paint_transform(brush_transform.unwrap_or(Affine::IDENTITY));
         self.0.fill_path(&shape.into_path(DEFAULT_TOLERANCE));
@@ -118,14 +108,15 @@ impl PaintScene for VelloCpuScenePainter {
         hint: bool,
         normalized_coords: &'a [NormalizedCoord],
         style: impl Into<StyleRef<'a>>,
-        brush: impl Into<BrushRef<'a>>,
+        paint: impl Into<PaintRef<'a>>,
         _brush_alpha: f32,
         transform: Affine,
         glyph_transform: Option<Affine>,
         glyphs: impl Iterator<Item = anyrender::Glyph>,
     ) {
         self.0.set_transform(transform);
-        self.0.set_paint(brush_ref_to_paint_type(brush.into()));
+        self.0
+            .set_paint(anyrender_paint_to_vello_cpu_paint(paint.into()));
 
         fn into_vello_cpu_glyph(g: anyrender::Glyph) -> vello_cpu::Glyph {
             vello_cpu::Glyph {
