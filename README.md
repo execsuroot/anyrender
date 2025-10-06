@@ -33,10 +33,17 @@ Currently existing backends are:
 
 Contributions for other backends (Skia, FemtoVG, etc) would be very welcome.
 
-### Drawing utilities
+### Content renderers
 
-- The [anyrender_svg](https://docs.rs/anyrender_svg) crate allows you to render SVGs with `anyrender` and `usvg`. USVG is used to parse the SVGs,
-  and drawing is delegated to the anyrender backend.
+These crates sit on top of the the AnyRender abstraction, and allow you render content through it:
+
+- [anyrender_svg](https://docs.rs/anyrender_svg) allows you to render SVGs with AnyRender. [usvg](https://docs.rs/usvg) is used to parse the SVGs.
+
+### Utility crates
+
+- [wgpu_context](https://docs.rs/wgpu_context) is a utility for managing `Device`s and other WGPU types
+- [pixels_window_renderer](https://docs.rs/pixels_window_renderer) implements an AnyRender `WindowRenderer` for any AnyRenderer `ImageRenderer` using the [pixels](https://docs.rs/pixels) crate.
+- [softbuffer_window_renderer](https://docs.rs/softbuffer_window_renderer) implements an AnyRender `WindowRenderer` for any AnyRenderer `ImageRenderer` using the [softbuffer](https://docs.rs/softbuffer) crate.
 
 
 ## Minimum supported Rust Version (MSRV)
