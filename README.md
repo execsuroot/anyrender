@@ -19,7 +19,7 @@ Discussion of AnyRender development happens in the Linebender Zulip at <https://
 The core [anyrender](https://docs.rs/anyrender) crate is a lightweight type/trait-only crate that defines three abstractions:
 
 - **The [PaintScene](https://docs.rs/anyrender/latest/anyrender/trait.PaintScene.html) trait accepts drawing commands.**
-  Applications and libraries draw by pushing commands into a [`PaintScene`]. Backends generally execute those commands to
+  Applications and libraries draw by pushing commands into a `PaintScene`. Backends generally execute those commands to
   produce an output (although they may do other things like store them for later use).
 - **The [WindowRenderer](https://docs.rs/anyrender/latest/anyrender/trait.WindowRenderer.html) trait abstracts over types that can render to a window**
 - **The [ImageRenderer](https://docs.rs/anyrender/latest/anyrender/trait.ImageRenderer.html) trait abstracts over types that can render to a `Vec<u8>` image buffer**
