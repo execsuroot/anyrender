@@ -1,6 +1,6 @@
-use anyrender::{PaintScene, WindowRenderer};
+use anyrender::{NullWindowRenderer, PaintScene, WindowRenderer};
 use anyrender_vello::VelloWindowRenderer;
-use anyrender_vello_cpu::VelloCpuWindowRenderer;
+use anyrender_vello_cpu::{PixelsWindowRenderer, SoftbufferWindowRenderer, VelloCpuImageRenderer};
 use kurbo::{Affine, Circle, Point, Rect, Stroke};
 use peniko::{Color, Fill};
 use std::sync::Arc;
@@ -18,9 +18,39 @@ struct App {
     height: u32,
 }
 
+type VelloCpuSBWindowRenderer = SoftbufferWindowRenderer<VelloCpuImageRenderer>;
+type VelloCpuWindowRenderer = PixelsWindowRenderer<VelloCpuImageRenderer>;
+
+// type InitialBackend = NullWindowRenderer;
+// type InitialBackend = VelloCpuWindowRenderer;
+type InitialBackend = VelloCpuSBWindowRenderer;
+// type InitialBackend = VelloWindowRenderer;
+
 enum Renderer {
     Gpu(Box<VelloWindowRenderer>),
     Cpu(Box<VelloCpuWindowRenderer>),
+    CpuSoftbuffer(Box<VelloCpuSBWindowRenderer>),
+    Null(NullWindowRenderer),
+}
+impl From<VelloWindowRenderer> for Renderer {
+    fn from(renderer: VelloWindowRenderer) -> Self {
+        Self::Gpu(Box::new(renderer))
+    }
+}
+impl From<VelloCpuWindowRenderer> for Renderer {
+    fn from(renderer: VelloCpuWindowRenderer) -> Self {
+        Self::Cpu(Box::new(renderer))
+    }
+}
+impl From<VelloCpuSBWindowRenderer> for Renderer {
+    fn from(renderer: VelloCpuSBWindowRenderer) -> Self {
+        Self::CpuSoftbuffer(Box::new(renderer))
+    }
+}
+impl From<NullWindowRenderer> for Renderer {
+    fn from(renderer: NullWindowRenderer) -> Self {
+        Self::Null(renderer)
+    }
 }
 
 impl Renderer {
@@ -28,6 +58,8 @@ impl Renderer {
         match self {
             Renderer::Gpu(r) => r.is_active(),
             Renderer::Cpu(r) => r.is_active(),
+            Renderer::CpuSoftbuffer(r) => r.is_active(),
+            Renderer::Null(r) => r.is_active(),
         }
     }
 
@@ -35,6 +67,8 @@ impl Renderer {
         match self {
             Renderer::Gpu(r) => r.set_size(w, h),
             Renderer::Cpu(r) => r.set_size(w, h),
+            Renderer::CpuSoftbuffer(r) => r.set_size(w, h),
+            Renderer::Null(r) => r.set_size(w, h),
         }
     }
 }
@@ -89,11 +123,10 @@ impl App {
         );
     }
 
-    fn set_backend<R: WindowRenderer>(
+    fn set_backend<R: WindowRenderer + Into<Renderer>>(
         &mut self,
         mut renderer: R,
         event_loop: &ActiveEventLoop,
-        f: impl FnOnce(R) -> Renderer,
     ) {
         let mut window = match &self.render_state {
             RenderState::Active { window, .. } => Some(window.clone()),
@@ -101,7 +134,7 @@ impl App {
         };
         let window = window.take().unwrap_or_else(|| {
             let attr = Window::default_attributes()
-                .with_inner_size(winit::dpi::PhysicalSize::new(self.width, self.height))
+                .with_inner_size(winit::dpi::LogicalSize::new(self.width, self.height))
                 .with_resizable(true)
                 .with_title("anyrender + winit demo")
                 .with_visible(true)
@@ -110,10 +143,8 @@ impl App {
         });
 
         renderer.resume(window.clone(), self.width, self.height);
-        self.render_state = RenderState::Active {
-            window,
-            renderer: f(renderer),
-        };
+        let renderer = renderer.into();
+        self.render_state = RenderState::Active { window, renderer };
         self.request_redraw();
     }
 }
@@ -126,9 +157,7 @@ impl ApplicationHandler for App {
     }
 
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        self.set_backend(VelloCpuWindowRenderer::new(), event_loop, |r| {
-            Renderer::Cpu(Box::new(r))
-        });
+        self.set_backend(InitialBackend::new(), event_loop);
     }
 
     fn window_event(
@@ -156,6 +185,10 @@ impl ApplicationHandler for App {
             WindowEvent::RedrawRequested => match renderer {
                 Renderer::Gpu(r) => r.render(|p| App::draw_scene(p, Color::from_rgb8(255, 0, 0))),
                 Renderer::Cpu(r) => r.render(|p| App::draw_scene(p, Color::from_rgb8(0, 255, 0))),
+                Renderer::CpuSoftbuffer(r) => {
+                    r.render(|p| App::draw_scene(p, Color::from_rgb8(0, 0, 255)))
+                }
+                Renderer::Null(r) => r.render(|p| App::draw_scene(p, Color::from_rgb8(0, 0, 0))),
             },
             WindowEvent::KeyboardInput {
                 event:
@@ -166,15 +199,14 @@ impl ApplicationHandler for App {
                     },
                 ..
             } => match renderer {
-                Renderer::Cpu(_) => {
-                    self.set_backend(VelloWindowRenderer::new(), event_loop, |r| {
-                        Renderer::Gpu(Box::new(r))
-                    });
+                Renderer::Cpu(_) | Renderer::CpuSoftbuffer(_) => {
+                    self.set_backend(VelloWindowRenderer::new(), event_loop);
                 }
                 Renderer::Gpu(_) => {
-                    self.set_backend(VelloCpuWindowRenderer::new(), event_loop, |r| {
-                        Renderer::Cpu(Box::new(r))
-                    });
+                    self.set_backend(NullWindowRenderer::new(), event_loop);
+                }
+                Renderer::Null(_) => {
+                    self.set_backend(VelloCpuWindowRenderer::new(), event_loop);
                 }
             },
             _ => {}
@@ -185,8 +217,8 @@ impl ApplicationHandler for App {
 fn main() {
     let mut app = App {
         render_state: RenderState::Suspended(None),
-        width: 1024,
-        height: 1024,
+        width: 800,
+        height: 600,
     };
 
     let event_loop = EventLoop::new().unwrap();
