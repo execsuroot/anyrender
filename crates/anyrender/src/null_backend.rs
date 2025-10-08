@@ -42,7 +42,7 @@ pub struct NullImageRenderer;
 
 impl NullImageRenderer {
     pub fn new() -> Self {
-        Self::default()
+        Self
     }
 }
 
@@ -75,7 +75,7 @@ pub struct NullScenePainter;
 
 impl NullScenePainter {
     pub fn new() -> Self {
-        Self::default()
+        Self
     }
 }
 
