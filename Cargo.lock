@@ -81,7 +81,7 @@ dependencies = [
 
 [[package]]
 name = "anyrender"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "kurbo 0.12.0",
  "peniko",
