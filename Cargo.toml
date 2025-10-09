@@ -46,7 +46,7 @@ softbuffer = "0.4"
 pixels = "0.15"
 
 # SVG
-usvg = "0.45.1"
+usvg = { version = "0.45.1", default-features = false }
 image = { version = "0.25", default-features = false }
 
 # Other dependencies
