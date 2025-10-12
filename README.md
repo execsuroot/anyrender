@@ -38,6 +38,7 @@ Contributions for other backends (Skia, FemtoVG, etc) would be very welcome.
 These crates sit on top of the the AnyRender abstraction, and allow you render content through it:
 
 - [anyrender_svg](https://docs.rs/anyrender_svg) allows you to render SVGs with AnyRender. [usvg](https://docs.rs/usvg) is used to parse the SVGs.
+- [polymorpher](https://github.com/Aiving/polymorpher) implements Material Design 3 shape morphing, and can be used with AnyRender by enabling the `kurbo` feature.
 
 ### Utility crates
 
