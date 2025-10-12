@@ -90,7 +90,7 @@ dependencies = [
 
 [[package]]
 name = "anyrender_svg"
-version = "0.6.2"
+version = "0.6.3"
 dependencies = [
  "anyrender",
  "image",
