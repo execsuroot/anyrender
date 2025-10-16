@@ -4039,6 +4039,7 @@ name = "winit-example"
 version = "0.1.0"
 dependencies = [
  "anyrender",
+ "anyrender_skia",
  "anyrender_vello",
  "anyrender_vello_cpu",
  "kurbo 0.12.0",
