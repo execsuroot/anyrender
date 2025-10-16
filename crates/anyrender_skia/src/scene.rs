@@ -173,6 +173,7 @@ impl PaintScene for SkiaScenePainter<'_> {
                             value,
                         }
                     })
+                    .filter(|coord| coord.value != 0.0)
                     .collect();
                 let variation_position = VariationPosition {
                     coordinates: &coordinates,
