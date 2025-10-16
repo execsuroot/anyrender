@@ -1,4 +1,4 @@
-use std::{ffi::CString, num::NonZeroU32, sync::Arc};
+use std::{collections::HashMap, ffi::CString, num::NonZeroU32, sync::Arc};
 
 use anyrender::WindowRenderer;
 use debug_timer::debug_timer;
@@ -10,7 +10,7 @@ use glutin::{
     prelude::{GlDisplay, NotCurrentGlContext, PossiblyCurrentGlContext},
     surface::{GlSurface, SurfaceAttributesBuilder, WindowSurface},
 };
-use skia_safe::Surface;
+use skia_safe::{FontMgr, Surface, Typeface};
 
 use crate::scene::SkiaScenePainter;
 
@@ -190,6 +190,8 @@ enum RenderState {
 struct ActiveRenderState {
     backend: Backend,
     surface: Surface,
+    font_mgr: FontMgr,
+    typeface_cache: HashMap<u32, Typeface>
 }
 
 #[derive(Clone, Default)]
@@ -224,8 +226,9 @@ impl WindowRenderer for SkiaWindowRenderer {
     fn resume(&mut self, window: Arc<dyn anyrender::WindowHandle>, width: u32, height: u32) {
         let mut backend = Backend::new_gl(window, width, height);
         let surface = backend.create_surface(width, height);
+        let font_mgr = FontMgr::new();
 
-        self.render_state = RenderState::Active(ActiveRenderState { backend, surface })
+        self.render_state = RenderState::Active(ActiveRenderState { backend, surface, font_mgr, typeface_cache: HashMap::new() })
     }
 
     fn suspend(&mut self) {
@@ -254,6 +257,8 @@ impl WindowRenderer for SkiaWindowRenderer {
 
         draw_fn(&mut SkiaScenePainter {
             inner: &mut state.surface,
+            font_mgr: &mut state.font_mgr,
+            typeface_cache: &mut state.typeface_cache
         });
         timer.record_time("cmd");
 

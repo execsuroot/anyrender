@@ -1,11 +1,15 @@
+use std::collections::HashMap;
+
 use anyrender::PaintScene;
+use peniko::StyleRef;
 use skia_safe::{
-    BlendMode, Color, Color4f, Matrix, Paint, PaintCap, PaintJoin, PaintStyle, RRect, Rect,
-    Surface, canvas::SaveLayerRec,
+    canvas::{GlyphPositions, SaveLayerRec}, font::Edging, font_arguments::{variation_position::Coordinate, VariationPosition}, image_filters::{self, CropRect}, utils::CustomTypefaceBuilder, BlendMode, Color, Color4f, Font, FontArguments, FontHinting, FontMgr, GlyphId, Handle, Matrix, Paint, PaintCap, PaintJoin, PaintStyle, Point, RRect, Rect, Surface, Typeface
 };
 
-pub struct SkiaScenePainter<'s> {
-    pub(crate) inner: &'s mut Surface,
+pub struct SkiaScenePainter<'a> {
+    pub(crate) inner: &'a mut Surface,
+    pub(crate) font_mgr: &'a mut FontMgr,
+    pub(crate) typeface_cache: &'a mut HashMap<u32, Typeface>,
 }
 
 impl PaintScene for SkiaScenePainter<'_> {
@@ -62,20 +66,8 @@ impl PaintScene for SkiaScenePainter<'_> {
         // };
 
         let mut paint = anyrender_brush_to_skia_paint(brush.into());
+        apply_peniko_style_to_skia_paint(StyleRef::Stroke(style), &mut paint);
         paint.set_anti_alias(true);
-        paint.set_style(PaintStyle::Stroke);
-        paint.set_stroke(true);
-        paint.set_stroke_width(style.width as f32);
-        paint.set_stroke_join(match style.join {
-            kurbo::Join::Bevel => PaintJoin::Bevel,
-            kurbo::Join::Miter => PaintJoin::Miter,
-            kurbo::Join::Round => PaintJoin::Round,
-        });
-        paint.set_stroke_cap(match style.start_cap {
-            kurbo::Cap::Butt => PaintCap::Butt,
-            kurbo::Cap::Square => PaintCap::Square,
-            kurbo::Cap::Round => PaintCap::Round,
-        });
 
         draw_kurbo_shape_to_skia_canvas(self.inner.canvas(), shape, &paint);
 
@@ -121,7 +113,82 @@ impl PaintScene for SkiaScenePainter<'_> {
         glyph_transform: Option<kurbo::Affine>,
         glyphs: impl Iterator<Item = anyrender::Glyph>,
     ) {
-        // ToDo: implement draw glyhps
+        self.inner.canvas().save();
+        self.inner
+            .canvas()
+            .set_matrix(&kurbo_affine_to_skia_matrix(transform).into());
+
+        let mut paint = anyrender_brush_to_skia_paint(brush.into());
+        apply_peniko_style_to_skia_paint(style.into(), &mut paint);
+        paint.set_alpha_f(brush_alpha);
+        paint.set_anti_alias(true);
+
+        if !self.typeface_cache.contains_key(&font.index) {
+            self.typeface_cache.insert(
+                font.index,
+                self.font_mgr
+                    .new_from_data(&font.data.data(), font.index as usize)
+                    .unwrap(),
+            );
+        }
+
+        let original_typeface = self.typeface_cache.get(&font.index).unwrap();
+        let mut normalized_typeface: Option<Typeface> = None;
+
+        if !normalized_coords.is_empty() {
+            let axes = original_typeface.variation_design_parameters().unwrap_or(vec![]);
+            if !axes.is_empty() {
+                let coordinates: Vec<Coordinate> = axes.iter()
+                    .zip(normalized_coords.iter())
+                    .map(|(axis_param, &raw_value)| {
+                        let value = raw_value as f32 / 16384.0; // f2dot14
+
+                        Coordinate {
+                            axis: axis_param.tag,
+                            value
+                        }
+                    })
+                    .collect();
+                let variation_position = VariationPosition { coordinates: &coordinates };
+
+                normalized_typeface = Some(
+                    original_typeface.clone_with_arguments(
+                        &FontArguments::new().set_variation_design_position(variation_position)
+                    ).unwrap()
+                );
+            }
+        }
+
+        let typeface = match &normalized_typeface {
+            Some(it) => it,
+            None => original_typeface,
+        };
+
+        let mut font = Font::from_typeface(typeface, font_size);
+        font.set_hinting(if hint {
+            FontHinting::Normal
+        } else {
+            FontHinting::None
+        });
+        font.set_edging(Edging::SubpixelAntiAlias);
+
+        let mut draw_glyphs: Vec<GlyphId> = vec![];
+        let mut draw_positions: Vec<Point> = vec![];
+
+        for glyph in glyphs {
+            draw_glyphs.push(GlyphId::from(glyph.id as u16));
+            draw_positions.push(Point::new(glyph.x, glyph.y));
+        }
+
+        self.inner.canvas().draw_glyphs_at(
+            &draw_glyphs[..],
+            GlyphPositions::Points(&draw_positions[..]),
+            Point::new(0.0, 0.0),
+            &font,
+            &paint,
+        );
+
+        self.inner.canvas().restore();
     }
 
     fn draw_box_shadow(
@@ -132,7 +199,73 @@ impl PaintScene for SkiaScenePainter<'_> {
         radius: f64,
         std_dev: f64,
     ) {
-        // ToDo: implement draw box shadow
+        self.inner.canvas().save();
+        self.inner
+            .canvas()
+            .set_matrix(&kurbo_affine_to_skia_matrix(transform).into());
+
+        let mut paint = Paint::default();
+        paint.set_anti_alias(true);
+        paint.set_color4f(
+            Color4f::new(
+                brush.components[0],
+                brush.components[1],
+                brush.components[2],
+                brush.components[3],
+            ),
+            None,
+        );
+        paint.set_style(PaintStyle::Fill);
+
+        paint.set_image_filter(
+            image_filters::blur(
+                (std_dev as f32, std_dev as f32),
+                None,
+                None,
+                CropRect::NO_CROP_RECT,
+            )
+            .unwrap(),
+        );
+
+        let rrect = RRect::new_nine_patch(
+            Rect::new(
+                rect.x0 as f32,
+                rect.y0 as f32,
+                rect.x1 as f32,
+                rect.y1 as f32,
+            ),
+            radius as f32,
+            radius as f32,
+            radius as f32,
+            radius as f32,
+        );
+
+        self.inner.canvas().draw_rrect(&rrect, &paint);
+
+        self.inner.canvas().restore();
+    }
+}
+
+fn apply_peniko_style_to_skia_paint<'a>(style: peniko::StyleRef<'a>, paint: &mut Paint) {
+    match style {
+        peniko::StyleRef::Fill(_) => {
+            paint.set_style(PaintStyle::Fill);
+        }
+        peniko::StyleRef::Stroke(stroke) => {
+            paint.set_style(PaintStyle::Stroke);
+            paint.set_stroke(true);
+            paint.set_stroke_width(stroke.width as f32);
+            paint.set_stroke_join(match stroke.join {
+                kurbo::Join::Bevel => PaintJoin::Bevel,
+                kurbo::Join::Miter => PaintJoin::Miter,
+                kurbo::Join::Round => PaintJoin::Round,
+            });
+            paint.set_stroke_cap(match stroke.start_cap {
+                kurbo::Cap::Butt => PaintCap::Butt,
+                kurbo::Cap::Square => PaintCap::Square,
+                kurbo::Cap::Round => PaintCap::Round,
+            });
+        }
     }
 }
 
