@@ -228,7 +228,12 @@ impl WindowRenderer for SkiaWindowRenderer {
         let surface = backend.create_surface(width, height);
         let font_mgr = FontMgr::new();
 
-        self.render_state = RenderState::Active(ActiveRenderState { backend, surface, font_mgr, typeface_cache: HashMap::new() })
+        self.render_state = RenderState::Active(ActiveRenderState {
+            backend,
+            surface,
+            font_mgr,
+            typeface_cache: HashMap::new(),
+        })
     }
 
     fn suspend(&mut self) {
@@ -258,7 +263,7 @@ impl WindowRenderer for SkiaWindowRenderer {
         draw_fn(&mut SkiaScenePainter {
             inner: &mut state.surface,
             font_mgr: &mut state.font_mgr,
-            typeface_cache: &mut state.typeface_cache
+            typeface_cache: &mut state.typeface_cache,
         });
         timer.record_time("cmd");
 

@@ -3,7 +3,13 @@ use std::collections::HashMap;
 use anyrender::PaintScene;
 use peniko::StyleRef;
 use skia_safe::{
-    canvas::{GlyphPositions, SaveLayerRec}, font::Edging, font_arguments::{variation_position::Coordinate, VariationPosition}, image_filters::{self, CropRect}, utils::CustomTypefaceBuilder, BlendMode, Color, Color4f, Font, FontArguments, FontHinting, FontMgr, GlyphId, Handle, Matrix, Paint, PaintCap, PaintJoin, PaintStyle, Point, RRect, Rect, Surface, Typeface
+    BlendMode, Color, Color4f, Font, FontArguments, FontHinting, FontMgr, GlyphId, Handle, Matrix,
+    Paint, PaintCap, PaintJoin, PaintStyle, Point, RRect, Rect, Surface, Typeface,
+    canvas::{GlyphPositions, SaveLayerRec},
+    font::Edging,
+    font_arguments::{VariationPosition, variation_position::Coordinate},
+    image_filters::{self, CropRect},
+    utils::CustomTypefaceBuilder,
 };
 
 pub struct SkiaScenePainter<'a> {
@@ -131,7 +137,12 @@ impl PaintScene for SkiaScenePainter<'_> {
                 .new_from_data(&font.data.data(), font.index as usize)
             else {
                 let tf = Typeface::make_deserialize(font.data.data(), None);
-                eprintln!("WARNING: failed to load font {} {} {}", font_key.0, font_key.1, tf.is_some());
+                eprintln!(
+                    "WARNING: failed to load font {} {} {}",
+                    font_key.0,
+                    font_key.1,
+                    tf.is_some()
+                );
                 return;
             };
             self.typeface_cache.insert(font_key, typeface);
@@ -147,25 +158,32 @@ impl PaintScene for SkiaScenePainter<'_> {
         }
 
         if !normalized_coords.is_empty() {
-            let axes = original_typeface.variation_design_parameters().unwrap_or(vec![]);
+            let axes = original_typeface
+                .variation_design_parameters()
+                .unwrap_or(vec![]);
             if !axes.is_empty() {
-                let coordinates: Vec<Coordinate> = axes.iter()
+                let coordinates: Vec<Coordinate> = axes
+                    .iter()
                     .zip(normalized_coords.iter())
                     .map(|(axis_param, &raw_value)| {
                         let value = f2dot14_to_f32(raw_value);
 
                         Coordinate {
                             axis: axis_param.tag,
-                            value
+                            value,
                         }
                     })
                     .collect();
-                let variation_position = VariationPosition { coordinates: &coordinates };
+                let variation_position = VariationPosition {
+                    coordinates: &coordinates,
+                };
 
                 normalized_typeface = Some(
-                    original_typeface.clone_with_arguments(
-                        &FontArguments::new().set_variation_design_position(variation_position)
-                    ).unwrap()
+                    original_typeface
+                        .clone_with_arguments(
+                            &FontArguments::new().set_variation_design_position(variation_position),
+                        )
+                        .unwrap(),
                 );
             }
         }
