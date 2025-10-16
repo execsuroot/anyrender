@@ -19,12 +19,14 @@ impl PaintScene for SkiaScenePainter<'_> {
         transform: kurbo::Affine,
         clip: &impl kurbo::Shape,
     ) {
-
-
         let mut paint = Paint::default();
         paint.set_alpha_f(alpha);
         paint.set_anti_alias(true);
         paint.set_blend_mode(peniko_blend_to_skia_blend(blend.into()));
+
+        self.inner
+            .canvas()
+            .save_layer(&SaveLayerRec::default().paint(&paint));
 
         self.inner
             .canvas()
@@ -33,13 +35,10 @@ impl PaintScene for SkiaScenePainter<'_> {
         self.inner
             .canvas()
             .clip_path(&kurbo_shape_to_skia_path(clip), None, None);
-
-        self.inner
-            .canvas()
-            .save_layer(&SaveLayerRec::default().paint(&paint));
     }
 
     fn pop_layer(&mut self) {
+        self.inner.canvas().restore();
         self.inner.canvas().restore();
     }
 
