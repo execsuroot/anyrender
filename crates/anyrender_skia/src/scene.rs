@@ -9,7 +9,7 @@ use skia_safe::{
 pub struct SkiaScenePainter<'a> {
     pub(crate) inner: &'a mut Surface,
     pub(crate) font_mgr: &'a mut FontMgr,
-    pub(crate) typeface_cache: &'a mut HashMap<u32, Typeface>,
+    pub(crate) typeface_cache: &'a mut HashMap<(u64, u32), Typeface>,
 }
 
 impl PaintScene for SkiaScenePainter<'_> {
@@ -123,16 +123,21 @@ impl PaintScene for SkiaScenePainter<'_> {
         paint.set_alpha_f(brush_alpha);
         paint.set_anti_alias(true);
 
-        if !self.typeface_cache.contains_key(&font.index) {
-            self.typeface_cache.insert(
-                font.index,
-                self.font_mgr
-                    .new_from_data(&font.data.data(), font.index as usize)
-                    .unwrap(),
-            );
+        let font_key = (font.data.id(), font.index);
+
+        if !self.typeface_cache.contains_key(&font_key) {
+            let Some(typeface) = self
+                .font_mgr
+                .new_from_data(&font.data.data(), font.index as usize)
+            else {
+                let tf = Typeface::make_deserialize(font.data.data(), None);
+                eprintln!("WARNING: failed to load font {} {} {}", font_key.0, font_key.1, tf.is_some());
+                return;
+            };
+            self.typeface_cache.insert(font_key, typeface);
         }
 
-        let original_typeface = self.typeface_cache.get(&font.index).unwrap();
+        let original_typeface = self.typeface_cache.get(&font_key).unwrap();
         let mut normalized_typeface: Option<Typeface> = None;
 
         if !normalized_coords.is_empty() {

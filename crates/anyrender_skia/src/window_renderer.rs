@@ -191,7 +191,7 @@ struct ActiveRenderState {
     backend: Backend,
     surface: Surface,
     font_mgr: FontMgr,
-    typeface_cache: HashMap<u32, Typeface>
+    typeface_cache: HashMap<(u64, u32), Typeface>,
 }
 
 #[derive(Clone, Default)]
