@@ -1,6 +1,7 @@
 use anyrender::PaintScene;
 use skia_safe::{
-    canvas::SaveLayerRec, BlendMode, Color, Color4f, Matrix, Paint, PaintCap, PaintJoin, PaintStyle, RRect, Rect, Surface
+    BlendMode, Color, Color4f, Matrix, Paint, PaintCap, PaintJoin, PaintStyle, RRect, Rect,
+    Surface, canvas::SaveLayerRec,
 };
 
 pub struct SkiaScenePainter<'s> {

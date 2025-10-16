@@ -1,7 +1,7 @@
 use anyrender::{NullWindowRenderer, PaintScene, WindowRenderer};
+use anyrender_skia::SkiaWindowRenderer;
 use anyrender_vello::VelloWindowRenderer;
 use anyrender_vello_cpu::{PixelsWindowRenderer, SoftbufferWindowRenderer, VelloCpuImageRenderer};
-use anyrender_skia::SkiaWindowRenderer;
 use kurbo::{Affine, Circle, Point, Rect, Stroke};
 use peniko::{Color, Fill};
 use std::sync::Arc;
@@ -193,7 +193,9 @@ impl ApplicationHandler for App {
                 self.request_redraw();
             }
             WindowEvent::RedrawRequested => match renderer {
-                Renderer::Skia(r) => r.render(|p| App::draw_scene(p, Color::from_rgb8(128, 128, 128))),
+                Renderer::Skia(r) => {
+                    r.render(|p| App::draw_scene(p, Color::from_rgb8(128, 128, 128)))
+                }
                 Renderer::Gpu(r) => r.render(|p| App::draw_scene(p, Color::from_rgb8(255, 0, 0))),
                 Renderer::Cpu(r) => r.render(|p| App::draw_scene(p, Color::from_rgb8(0, 255, 0))),
                 Renderer::CpuSoftbuffer(r) => {
