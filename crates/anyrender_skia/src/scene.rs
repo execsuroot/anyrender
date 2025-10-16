@@ -62,6 +62,7 @@ impl PaintScene for SkiaScenePainter<'_> {
         // };
 
         let mut paint = anyrender_brush_to_skia_paint(brush.into());
+        paint.set_anti_alias(true);
         paint.set_style(PaintStyle::Stroke);
         paint.set_stroke(true);
         paint.set_stroke_width(style.width as f32);
@@ -99,7 +100,8 @@ impl PaintScene for SkiaScenePainter<'_> {
         //         .set_matrix(&kurbo_affine_to_skia_matrix(affine));
         // };
 
-        let paint = anyrender_brush_to_skia_paint(brush.into());
+        let mut paint = anyrender_brush_to_skia_paint(brush.into());
+        paint.set_anti_alias(true);
 
         draw_kurbo_shape_to_skia_canvas(self.inner.canvas(), shape, &paint);
 
