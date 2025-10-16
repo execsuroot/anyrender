@@ -31,6 +31,11 @@ impl Backend {
         let gl_display = unsafe {
             Display::new(
                 raw_display_handle,
+                #[cfg(target_os = "macos")]
+                glutin::display::DisplayApiPreference::Cgl,
+                #[cfg(target_os = "windows")]
+                glutin::display::DisplayApiPreference::Wgl,
+                #[cfg(not(any(target_os = "windows", target_os = "macos")))]
                 glutin::display::DisplayApiPreference::Egl,
             )
             .unwrap()
