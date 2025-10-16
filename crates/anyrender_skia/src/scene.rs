@@ -140,13 +140,19 @@ impl PaintScene for SkiaScenePainter<'_> {
         let original_typeface = self.typeface_cache.get(&font_key).unwrap();
         let mut normalized_typeface: Option<Typeface> = None;
 
+        fn f2dot14_to_f32(raw_value: i16) -> f32 {
+            let int = (raw_value >> 14) as f32;
+            let fract = (raw_value & (!0 << 14)) as f32 / (1 << 14) as f32;
+            int + fract
+        }
+
         if !normalized_coords.is_empty() {
             let axes = original_typeface.variation_design_parameters().unwrap_or(vec![]);
             if !axes.is_empty() {
                 let coordinates: Vec<Coordinate> = axes.iter()
                     .zip(normalized_coords.iter())
                     .map(|(axis_param, &raw_value)| {
-                        let value = raw_value as f32 / 16384.0; // f2dot14
+                        let value = f2dot14_to_f32(raw_value);
 
                         Coordinate {
                             axis: axis_param.tag,
