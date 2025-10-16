@@ -19,9 +19,7 @@ impl PaintScene for SkiaScenePainter<'_> {
         transform: kurbo::Affine,
         clip: &impl kurbo::Shape,
     ) {
-        self.inner
-            .canvas()
-            .clip_path(&kurbo_shape_to_skia_path(clip), None, None);
+
 
         let mut paint = Paint::default();
         paint.set_alpha_f(alpha);
@@ -30,7 +28,11 @@ impl PaintScene for SkiaScenePainter<'_> {
 
         self.inner
             .canvas()
-            .concat(&kurbo_affine_to_skia_matrix(transform));
+            .set_matrix(&kurbo_affine_to_skia_matrix(transform).into());
+
+        self.inner
+            .canvas()
+            .clip_path(&kurbo_shape_to_skia_path(clip), None, None);
 
         self.inner
             .canvas()
@@ -52,12 +54,12 @@ impl PaintScene for SkiaScenePainter<'_> {
         self.inner.canvas().save();
         self.inner
             .canvas()
-            .concat(&kurbo_affine_to_skia_matrix(transform));
-        if let Some(affine) = brush_transform {
-            self.inner
-                .canvas()
-                .concat(&kurbo_affine_to_skia_matrix(affine));
-        };
+            .set_matrix(&kurbo_affine_to_skia_matrix(transform).into());
+        // if let Some(affine) = brush_transform {
+        //     self.inner
+        //         .canvas()
+        //         .set_matrix(&kurbo_affine_to_skia_matrix(affine));
+        // };
 
         let mut paint = anyrender_brush_to_skia_paint(brush.into());
         paint.set_style(PaintStyle::Stroke);
@@ -90,12 +92,12 @@ impl PaintScene for SkiaScenePainter<'_> {
         self.inner.canvas().save();
         self.inner
             .canvas()
-            .concat(&kurbo_affine_to_skia_matrix(transform));
-        if let Some(affine) = brush_transform {
-            self.inner
-                .canvas()
-                .concat(&kurbo_affine_to_skia_matrix(affine));
-        };
+            .set_matrix(&kurbo_affine_to_skia_matrix(transform).into());
+        // if let Some(affine) = brush_transform {
+        //     self.inner
+        //         .canvas()
+        //         .set_matrix(&kurbo_affine_to_skia_matrix(affine));
+        // };
 
         let paint = anyrender_brush_to_skia_paint(brush.into());
 
