@@ -29,10 +29,10 @@ glutin = { version = "0.32.3", features = ["default", "wgl", "egl"] }
 
 
 [target.'cfg(target_os = "macos")'.dependencies]
-metal-rs = { package = "metal", version = "0.24.0" }
-raw-window-handle = "0.6.0"
-objc = "0.2.7"
-cocoa = "0.26.0"
-core-graphics-types = "0.1.1"
-foreign-types-shared = "0.1.1"
+objc2 = {version = "0.6.3", default-features = false}
+objc2-core-foundation = {version = "0.3.2", default-features = false }
+objc2-metal = {version = "0.3.2", default-features = false, features = ["MTLCommandBuffer", "MTLCommandQueue"]}
+objc2-app-kit = {version = "0.3.2", features = ["NSView", "objc2-quartz-core"], default-features = false}
+objc2-quartz-core = {version = "0.3.2", default-features = false}
+
 skia-safe = { version = "0.89.1", features = ["metal"] }
