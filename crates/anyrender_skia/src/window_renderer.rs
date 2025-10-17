@@ -55,6 +55,9 @@ impl WindowRenderer for SkiaWindowRenderer {
         Self: 'a;
 
     fn resume(&mut self, window: Arc<dyn anyrender::WindowHandle>, width: u32, height: u32) {
+        #[cfg(target_os = "macos")]
+        let backend = crate::metal::MetalBackend::new(window, width, height);
+        #[cfg(not(target_os = "macos"))]
         let backend = OpenGLBackend::new(window, width, height);
 
         self.render_state = RenderState::Active(ActiveRenderState {
