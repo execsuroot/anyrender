@@ -1,22 +1,10 @@
-use std::{collections::HashMap, ffi::CString, num::NonZeroU32, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use anyrender::WindowRenderer;
 use debug_timer::debug_timer;
-use gl::types::GLint;
-use glutin::{
-    config::{ConfigTemplateBuilder, GetGlConfig, GlConfig},
-    context::ContextAttributesBuilder,
-    display::{Display, GetGlDisplay},
-    prelude::{GlDisplay, NotCurrentGlContext, PossiblyCurrentGlContext},
-    surface::{GlSurface, SurfaceAttributesBuilder, WindowSurface},
-};
-use raw_window_handle::HasWindowHandle;
-use skia_safe::{Canvas, FontMgr, Surface, Typeface, gpu::direct_contexts};
-use vulkano::{
-    Handle, VulkanObject, device::QueueCreateInfo, swapchain::acquire_next_image, sync::GpuFuture,
-};
+use skia_safe::{FontMgr, Surface, Typeface};
 
-use crate::{opengl::OpenGLBackend, scene::SkiaScenePainter, vulkan::VulkanBackend};
+use crate::{opengl::OpenGLBackend, scene::SkiaScenePainter};
 
 pub(crate) trait SkiaBackend {
     fn set_size(&mut self, width: u32, height: u32);
@@ -67,7 +55,7 @@ impl WindowRenderer for SkiaWindowRenderer {
         Self: 'a;
 
     fn resume(&mut self, window: Arc<dyn anyrender::WindowHandle>, width: u32, height: u32) {
-        let backend = VulkanBackend::new(window, width, height);
+        let backend = OpenGLBackend::new(window, width, height);
 
         self.render_state = RenderState::Active(ActiveRenderState {
             backend: Box::new(backend),
