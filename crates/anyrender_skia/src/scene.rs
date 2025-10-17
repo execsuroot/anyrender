@@ -3,26 +3,18 @@ use std::collections::HashMap;
 use anyrender::PaintScene;
 use peniko::{StyleRef, color::DynamicColor};
 use skia_safe::{
-    AlphaType, BlendMode, Color, Color4f, ColorType, Data, Font, FontArguments, FontHinting,
-    FontMgr, GlyphId, ImageInfo, Matrix, Paint, PaintCap, PaintJoin, PaintStyle, Point, RRect,
-    Rect, SamplingOptions, Shader, Surface, TileMode, Typeface,
-    canvas::{GlyphPositions, SaveLayerRec},
-    font::Edging,
-    font_arguments::{VariationPosition, variation_position::Coordinate},
-    gradient_shader::{Interpolation, interpolation},
-    image_filters::{self, CropRect},
-    shaders,
+    canvas::{GlyphPositions, SaveLayerRec}, font::Edging, font_arguments::{variation_position::Coordinate, VariationPosition}, gradient_shader::{interpolation, Interpolation}, image_filters::{self, CropRect}, shaders, AlphaType, BlendMode, Canvas, Color, Color4f, ColorType, Data, Font, FontArguments, FontHinting, FontMgr, GlyphId, ImageInfo, Matrix, Paint, PaintCap, PaintJoin, PaintStyle, Point, RRect, Rect, SamplingOptions, Shader, Surface, TileMode, Typeface
 };
 
 pub struct SkiaScenePainter<'a> {
-    pub(crate) inner: &'a mut Surface,
+    pub(crate) inner: &'a Canvas,
     pub(crate) font_mgr: &'a mut FontMgr,
     pub(crate) typeface_cache: &'a mut HashMap<(u64, u32), Typeface>,
 }
 
 impl PaintScene for SkiaScenePainter<'_> {
     fn reset(&mut self) {
-        self.inner.canvas().clear(Color::WHITE);
+        self.inner.clear(Color::WHITE);
     }
 
     fn push_layer(
@@ -38,21 +30,18 @@ impl PaintScene for SkiaScenePainter<'_> {
         paint.set_blend_mode(peniko_blend_to_skia_blend(blend.into()));
 
         self.inner
-            .canvas()
             .save_layer(&SaveLayerRec::default().paint(&paint));
 
         self.inner
-            .canvas()
             .set_matrix(&kurbo_affine_to_skia_matrix(transform).into());
 
         self.inner
-            .canvas()
             .clip_path(&kurbo_shape_to_skia_path(clip), None, None);
     }
 
     fn pop_layer(&mut self) {
-        self.inner.canvas().restore();
-        self.inner.canvas().restore();
+        self.inner.restore();
+        self.inner.restore();
     }
 
     fn stroke<'a>(
@@ -63,18 +52,17 @@ impl PaintScene for SkiaScenePainter<'_> {
         brush_transform: Option<kurbo::Affine>,
         shape: &impl kurbo::Shape,
     ) {
-        self.inner.canvas().save();
+        self.inner.save();
         self.inner
-            .canvas()
             .set_matrix(&kurbo_affine_to_skia_matrix(transform).into());
 
         let mut paint = anyrender_brush_to_skia_paint(brush.into(), brush_transform);
         apply_peniko_style_to_skia_paint(StyleRef::Stroke(style), &mut paint);
         paint.set_anti_alias(true);
 
-        draw_kurbo_shape_to_skia_canvas(self.inner.canvas(), shape, &paint);
+        draw_kurbo_shape_to_skia_canvas(self.inner, shape, &paint);
 
-        self.inner.canvas().restore();
+        self.inner.restore();
     }
 
     fn fill<'a>(
@@ -85,18 +73,17 @@ impl PaintScene for SkiaScenePainter<'_> {
         brush_transform: Option<kurbo::Affine>,
         shape: &impl kurbo::Shape,
     ) {
-        self.inner.canvas().save();
+        self.inner.save();
         self.inner
-            .canvas()
             .set_matrix(&kurbo_affine_to_skia_matrix(transform).into());
 
         let mut paint = anyrender_brush_to_skia_paint(brush.into(), brush_transform);
         paint.set_style(PaintStyle::Fill);
         paint.set_anti_alias(true);
 
-        draw_kurbo_shape_to_skia_canvas(self.inner.canvas(), shape, &paint);
+        draw_kurbo_shape_to_skia_canvas(self.inner, shape, &paint);
 
-        self.inner.canvas().restore();
+        self.inner.restore();
     }
 
     fn draw_glyphs<'a, 's: 'a>(
@@ -112,14 +99,12 @@ impl PaintScene for SkiaScenePainter<'_> {
         glyph_transform: Option<kurbo::Affine>,
         glyphs: impl Iterator<Item = anyrender::Glyph>,
     ) {
-        self.inner.canvas().save();
+        self.inner.save();
         self.inner
-            .canvas()
             .set_matrix(&kurbo_affine_to_skia_matrix(transform).into());
 
         if let Some(affine) = glyph_transform {
             self.inner
-                .canvas()
                 .concat(&kurbo_affine_to_skia_matrix(affine));
         }
 
@@ -209,7 +194,7 @@ impl PaintScene for SkiaScenePainter<'_> {
             draw_positions.push(Point::new(glyph.x, glyph.y));
         }
 
-        self.inner.canvas().draw_glyphs_at(
+        self.inner.draw_glyphs_at(
             &draw_glyphs[..],
             GlyphPositions::Points(&draw_positions[..]),
             Point::new(0.0, 0.0),
@@ -217,7 +202,7 @@ impl PaintScene for SkiaScenePainter<'_> {
             &paint,
         );
 
-        self.inner.canvas().restore();
+        self.inner.restore();
     }
 
     fn draw_box_shadow(
@@ -228,9 +213,8 @@ impl PaintScene for SkiaScenePainter<'_> {
         radius: f64,
         std_dev: f64,
     ) {
-        self.inner.canvas().save();
+        self.inner.save();
         self.inner
-            .canvas()
             .set_matrix(&kurbo_affine_to_skia_matrix(transform).into());
 
         let mut paint = Paint::default();
@@ -269,9 +253,9 @@ impl PaintScene for SkiaScenePainter<'_> {
             radius as f32,
         );
 
-        self.inner.canvas().draw_rrect(&rrect, &paint);
+        self.inner.draw_rrect(&rrect, &paint);
 
-        self.inner.canvas().restore();
+        self.inner.restore();
     }
 }
 

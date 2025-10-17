@@ -1,3 +1,5 @@
+pub(crate) mod opengl;
+pub(crate) mod vulkan;
 mod image_renderer;
 mod scene;
 mod window_renderer;
