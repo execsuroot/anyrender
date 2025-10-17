@@ -144,7 +144,7 @@ impl PaintScene for SkiaScenePainter<'_> {
 
         fn f2dot14_to_f32(raw_value: i16) -> f32 {
             let int = (raw_value >> 14) as f32;
-            let fract = (raw_value & (!0 << 14)) as f32 / (1 << 14) as f32;
+            let fract = (raw_value & !(!0 << 14)) as f32 / (1 << 14) as f32;
             int + fract
         }
 
@@ -155,17 +155,20 @@ impl PaintScene for SkiaScenePainter<'_> {
             if !axes.is_empty() {
                 let coordinates: Vec<Coordinate> = axes
                     .iter()
-                    .zip(normalized_coords.iter())
-                    .map(|(axis, &raw_value)| {
-                        let factor = f2dot14_to_f32(raw_value);
+                    .zip(normalized_coords.iter().map(|c| f2dot14_to_f32(*c)))
+                    .filter(|(_, value)| *value != 0.0)
+                    .map(|(axis, factor)| {
                         let value = axis.min + ((axis.max - axis.min) * factor);
+
+                        // let bytes = axis.tag.to_be_bytes();
+                        // let tag_s = str::from_utf8(&bytes).unwrap();
+                        // println!("{tag_s} {factor} {value}");
 
                         Coordinate {
                             axis: axis.tag,
                             value,
                         }
                     })
-                    .filter(|coord| coord.value != 0.0)
                     .collect();
                 let variation_position = VariationPosition {
                     coordinates: &coordinates,
