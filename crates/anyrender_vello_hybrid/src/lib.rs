@@ -1,4 +1,4 @@
-//! An Anyrender backend using the vello_cpu crate
+//! A [`vello_hybrid`] backend for the [`anyrender`] 2D drawing abstraction
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 mod scene;
