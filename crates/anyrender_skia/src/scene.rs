@@ -1,15 +1,15 @@
 use std::collections::HashMap;
 
 use anyrender::PaintScene;
-use peniko::StyleRef;
+use peniko::{StyleRef, color::DynamicColor};
 use skia_safe::{
-    BlendMode, Color, Color4f, Font, FontArguments, FontHinting, FontMgr, GlyphId, Handle, Matrix,
-    Paint, PaintCap, PaintJoin, PaintStyle, Point, RRect, Rect, Surface, Typeface,
+    BlendMode, Color, Color4f, Font, FontArguments, FontHinting, FontMgr, GlyphId, Matrix, Paint,
+    PaintCap, PaintJoin, PaintStyle, Point, RRect, Rect, Shader, Surface, TileMode, Typeface,
     canvas::{GlyphPositions, SaveLayerRec},
     font::Edging,
     font_arguments::{VariationPosition, variation_position::Coordinate},
+    gradient_shader::{Interpolation, interpolation},
     image_filters::{self, CropRect},
-    utils::CustomTypefaceBuilder,
 };
 
 pub struct SkiaScenePainter<'a> {
@@ -65,13 +65,8 @@ impl PaintScene for SkiaScenePainter<'_> {
         self.inner
             .canvas()
             .set_matrix(&kurbo_affine_to_skia_matrix(transform).into());
-        // if let Some(affine) = brush_transform {
-        //     self.inner
-        //         .canvas()
-        //         .set_matrix(&kurbo_affine_to_skia_matrix(affine));
-        // };
 
-        let mut paint = anyrender_brush_to_skia_paint(brush.into());
+        let mut paint = anyrender_brush_to_skia_paint(brush.into(), brush_transform);
         apply_peniko_style_to_skia_paint(StyleRef::Stroke(style), &mut paint);
         paint.set_anti_alias(true);
 
@@ -92,13 +87,9 @@ impl PaintScene for SkiaScenePainter<'_> {
         self.inner
             .canvas()
             .set_matrix(&kurbo_affine_to_skia_matrix(transform).into());
-        // if let Some(affine) = brush_transform {
-        //     self.inner
-        //         .canvas()
-        //         .set_matrix(&kurbo_affine_to_skia_matrix(affine));
-        // };
 
-        let mut paint = anyrender_brush_to_skia_paint(brush.into());
+        let mut paint = anyrender_brush_to_skia_paint(brush.into(), brush_transform);
+        paint.set_style(PaintStyle::Fill);
         paint.set_anti_alias(true);
 
         draw_kurbo_shape_to_skia_canvas(self.inner.canvas(), shape, &paint);
@@ -124,7 +115,13 @@ impl PaintScene for SkiaScenePainter<'_> {
             .canvas()
             .set_matrix(&kurbo_affine_to_skia_matrix(transform).into());
 
-        let mut paint = anyrender_brush_to_skia_paint(brush.into());
+        if let Some(affine) = glyph_transform {
+            self.inner
+                .canvas()
+                .concat(&kurbo_affine_to_skia_matrix(affine));
+        }
+
+        let mut paint = anyrender_brush_to_skia_paint(brush.into(), None);
         apply_peniko_style_to_skia_paint(style.into(), &mut paint);
         paint.set_alpha_f(brush_alpha);
         paint.set_anti_alias(true);
@@ -299,7 +296,10 @@ fn apply_peniko_style_to_skia_paint<'a>(style: peniko::StyleRef<'a>, paint: &mut
     }
 }
 
-fn anyrender_brush_to_skia_paint<'a>(brush: anyrender::PaintRef<'a>) -> Paint {
+fn anyrender_brush_to_skia_paint<'a>(
+    brush: anyrender::PaintRef<'a>,
+    brush_transform: Option<kurbo::Affine>,
+) -> Paint {
     match brush {
         anyrender::Paint::Solid(alpha_color) => Paint::new(
             Color4f::new(
@@ -310,10 +310,197 @@ fn anyrender_brush_to_skia_paint<'a>(brush: anyrender::PaintRef<'a>) -> Paint {
             ),
             None,
         ),
-        anyrender::Paint::Gradient(_) => Paint::default(), // ToDo: implement gradient using paint shader
+        anyrender::Paint::Gradient(gradient) => {
+            let shader = match gradient.kind {
+                peniko::GradientKind::Linear(linear_gradient_position) => {
+                    let mut colors: Vec<Color4f> = vec![];
+                    let mut positions: Vec<f32> = vec![];
+
+                    for color_stop in gradient.stops.iter() {
+                        colors.push(peniko_to_skia_dyn_color(color_stop.color));
+                        positions.push(color_stop.offset);
+                    }
+                    let start = skpt(linear_gradient_position.start);
+                    let end = skpt(linear_gradient_position.end);
+
+                    let tile_mode = match gradient.extend {
+                        peniko::Extend::Pad => TileMode::Clamp,
+                        peniko::Extend::Repeat => TileMode::Repeat,
+                        peniko::Extend::Reflect => TileMode::Mirror,
+                    };
+
+                    let interpolation = Interpolation {
+                        color_space: peniko_to_skia_cs_tag_to_interpol_cs(
+                            gradient.interpolation_cs,
+                        ),
+                        in_premul: interpolation::InPremul::Yes,
+                        hue_method: peniko_to_skia_hue_direction_to_hue_method(
+                            gradient.hue_direction,
+                        ),
+                    };
+
+                    Shader::linear_gradient_with_interpolation(
+                        (start, end),
+                        (&colors[..], None),
+                        &positions[..],
+                        tile_mode,
+                        interpolation,
+                        &brush_transform.map(|it| kurbo_affine_to_skia_matrix(it)),
+                    )
+                    .unwrap()
+                }
+                peniko::GradientKind::Radial(radial_gradient_position) => {
+                    let mut colors: Vec<Color4f> = vec![];
+                    let mut positions: Vec<f32> = vec![];
+
+                    for color_stop in gradient.stops.iter() {
+                        colors.push(peniko_to_skia_dyn_color(color_stop.color));
+                        positions.push(color_stop.offset);
+                    }
+
+                    let start_center = skpt(radial_gradient_position.start_center);
+                    let start_radius = radial_gradient_position.start_radius;
+                    let end_center = skpt(radial_gradient_position.end_center);
+                    let end_radius = radial_gradient_position.end_radius;
+
+                    let tile_mode = match gradient.extend {
+                        peniko::Extend::Pad => TileMode::Clamp,
+                        peniko::Extend::Repeat => TileMode::Repeat,
+                        peniko::Extend::Reflect => TileMode::Mirror,
+                    };
+
+                    let interpolation = Interpolation {
+                        color_space: peniko_to_skia_cs_tag_to_interpol_cs(
+                            gradient.interpolation_cs,
+                        ),
+                        in_premul: interpolation::InPremul::Yes,
+                        hue_method: peniko_to_skia_hue_direction_to_hue_method(
+                            gradient.hue_direction,
+                        ),
+                    };
+
+                    if start_center == end_center && start_radius == end_radius {
+                        Shader::radial_gradient_with_interpolation(
+                            (start_center, start_radius),
+                            (&colors[..], None),
+                            &positions[..],
+                            tile_mode,
+                            interpolation,
+                            &brush_transform.map(|it| kurbo_affine_to_skia_matrix(it)),
+                        )
+                        .unwrap()
+                    } else {
+                        Shader::two_point_conical_gradient_with_interpolation(
+                            (start_center, start_radius),
+                            (end_center, end_radius),
+                            (&colors[..], None),
+                            &positions[..],
+                            tile_mode,
+                            interpolation,
+                            &brush_transform.map(|it| kurbo_affine_to_skia_matrix(it)),
+                        )
+                        .unwrap()
+                    }
+                }
+                peniko::GradientKind::Sweep(sweep_gradient_position) => {
+                    let mut colors: Vec<Color4f> = vec![];
+                    let mut positions: Vec<f32> = vec![];
+
+                    for color_stop in gradient.stops.iter() {
+                        colors.push(peniko_to_skia_dyn_color(color_stop.color));
+                        positions.push(color_stop.offset);
+                    }
+                    let center = skpt(sweep_gradient_position.center);
+
+                    let tile_mode = match gradient.extend {
+                        peniko::Extend::Pad => TileMode::Clamp,
+                        peniko::Extend::Repeat => TileMode::Repeat,
+                        peniko::Extend::Reflect => TileMode::Mirror,
+                    };
+
+                    let interpolation = Interpolation {
+                        color_space: peniko_to_skia_cs_tag_to_interpol_cs(
+                            gradient.interpolation_cs,
+                        ),
+                        in_premul: interpolation::InPremul::Yes,
+                        hue_method: peniko_to_skia_hue_direction_to_hue_method(
+                            gradient.hue_direction,
+                        ),
+                    };
+
+                    Shader::sweep_gradient_with_interpolation(
+                        center,
+                        (&colors[..], None),
+                        &positions[..],
+                        tile_mode,
+                        (
+                            rad_to_deg(sweep_gradient_position.start_angle),
+                            rad_to_deg(sweep_gradient_position.end_angle),
+                        ),
+                        interpolation,
+                        &brush_transform.map(|it| kurbo_affine_to_skia_matrix(it)),
+                    )
+                    .unwrap()
+                }
+            };
+
+            let mut paint = Paint::default();
+            paint.set_shader(Some(shader));
+
+            paint
+        } // ToDo: implement gradient using paint shader
         anyrender::Paint::Image(_) => Paint::default(), // ToDo: implement image using paint texture
         anyrender::Paint::Custom(_) => unreachable!(),  // ToDo: figure out what to do with this
     }
+}
+
+fn rad_to_deg(rad: f32) -> f32 {
+    if rad == 0.0 {
+        return 0.0;
+    }
+
+    rad * 180.0 / std::f32::consts::PI
+}
+
+fn peniko_to_skia_hue_direction_to_hue_method(
+    direction: peniko::color::HueDirection,
+) -> interpolation::HueMethod {
+    match direction {
+        peniko::color::HueDirection::Shorter => interpolation::HueMethod::Shorter,
+        peniko::color::HueDirection::Longer => interpolation::HueMethod::Longer,
+        peniko::color::HueDirection::Increasing => interpolation::HueMethod::Increasing,
+        peniko::color::HueDirection::Decreasing => interpolation::HueMethod::Decreasing,
+        _ => unreachable!(),
+    }
+}
+
+fn peniko_to_skia_cs_tag_to_interpol_cs(
+    space: peniko::color::ColorSpaceTag,
+) -> interpolation::ColorSpace {
+    match space {
+        peniko::color::ColorSpaceTag::Srgb => interpolation::ColorSpace::SRGB,
+        peniko::color::ColorSpaceTag::LinearSrgb => interpolation::ColorSpace::SRGBLinear,
+        peniko::color::ColorSpaceTag::Lab => interpolation::ColorSpace::Lab,
+        peniko::color::ColorSpaceTag::Lch => interpolation::ColorSpace::LCH,
+        peniko::color::ColorSpaceTag::Hsl => interpolation::ColorSpace::HSL,
+        peniko::color::ColorSpaceTag::Hwb => interpolation::ColorSpace::HWB,
+        peniko::color::ColorSpaceTag::Oklab => interpolation::ColorSpace::OKLab,
+        peniko::color::ColorSpaceTag::Oklch => interpolation::ColorSpace::OKLCH,
+        peniko::color::ColorSpaceTag::DisplayP3 => interpolation::ColorSpace::DisplayP3,
+        peniko::color::ColorSpaceTag::A98Rgb => interpolation::ColorSpace::A98RGB,
+        peniko::color::ColorSpaceTag::ProphotoRgb => interpolation::ColorSpace::ProphotoRGB,
+        peniko::color::ColorSpaceTag::Rec2020 => interpolation::ColorSpace::Rec2020,
+        _ => interpolation::ColorSpace::SRGB, // ToDo: overview unsupported color space tags and possibly document it, for now just fallback
+    }
+}
+
+fn peniko_to_skia_dyn_color(color: DynamicColor) -> Color4f {
+    Color4f::new(
+        color.components[0],
+        color.components[1],
+        color.components[2],
+        color.components[3],
+    )
 }
 
 fn kurbo_affine_to_skia_matrix(affine: kurbo::Affine) -> Matrix {
@@ -436,10 +623,6 @@ fn kurbo_shape_to_skia_path(shape: &impl kurbo::Shape) -> skia_safe::Path {
         add_kurbo_bezpath_el_to_skia_path(&el, &mut sk_path);
     }
     sk_path
-}
-
-fn kurbo_bezpath_to_skia_path(path: &kurbo::BezPath) -> skia_safe::Path {
-    kurbo_bezpath_els_to_skia_path(path.elements())
 }
 
 fn kurbo_bezpath_els_to_skia_path(path: &[kurbo::PathEl]) -> skia_safe::Path {
