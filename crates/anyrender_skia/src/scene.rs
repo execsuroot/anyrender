@@ -3,13 +3,15 @@ use std::collections::HashMap;
 use anyrender::PaintScene;
 use peniko::{StyleRef, color::DynamicColor};
 use skia_safe::{
-    BlendMode, Color, Color4f, Font, FontArguments, FontHinting, FontMgr, GlyphId, Matrix, Paint,
-    PaintCap, PaintJoin, PaintStyle, Point, RRect, Rect, Shader, Surface, TileMode, Typeface,
+    AlphaType, BlendMode, Color, Color4f, ColorType, Data, Font, FontArguments, FontHinting,
+    FontMgr, GlyphId, ImageInfo, Matrix, Paint, PaintCap, PaintJoin, PaintStyle, Point, RRect,
+    Rect, SamplingOptions, Shader, Surface, TileMode, Typeface,
     canvas::{GlyphPositions, SaveLayerRec},
     font::Edging,
     font_arguments::{VariationPosition, variation_position::Coordinate},
     gradient_shader::{Interpolation, interpolation},
     image_filters::{self, CropRect},
+    shaders,
 };
 
 pub struct SkiaScenePainter<'a> {
@@ -323,12 +325,6 @@ fn anyrender_brush_to_skia_paint<'a>(
                     let start = skpt(linear_gradient_position.start);
                     let end = skpt(linear_gradient_position.end);
 
-                    let tile_mode = match gradient.extend {
-                        peniko::Extend::Pad => TileMode::Clamp,
-                        peniko::Extend::Repeat => TileMode::Repeat,
-                        peniko::Extend::Reflect => TileMode::Mirror,
-                    };
-
                     let interpolation = Interpolation {
                         color_space: peniko_to_skia_cs_tag_to_interpol_cs(
                             gradient.interpolation_cs,
@@ -343,7 +339,7 @@ fn anyrender_brush_to_skia_paint<'a>(
                         (start, end),
                         (&colors[..], None),
                         &positions[..],
-                        tile_mode,
+                        peniko_to_skia_extend_to_tile_mode(gradient.extend),
                         interpolation,
                         &brush_transform.map(|it| kurbo_affine_to_skia_matrix(it)),
                     )
@@ -363,12 +359,6 @@ fn anyrender_brush_to_skia_paint<'a>(
                     let end_center = skpt(radial_gradient_position.end_center);
                     let end_radius = radial_gradient_position.end_radius;
 
-                    let tile_mode = match gradient.extend {
-                        peniko::Extend::Pad => TileMode::Clamp,
-                        peniko::Extend::Repeat => TileMode::Repeat,
-                        peniko::Extend::Reflect => TileMode::Mirror,
-                    };
-
                     let interpolation = Interpolation {
                         color_space: peniko_to_skia_cs_tag_to_interpol_cs(
                             gradient.interpolation_cs,
@@ -384,7 +374,7 @@ fn anyrender_brush_to_skia_paint<'a>(
                             (start_center, start_radius),
                             (&colors[..], None),
                             &positions[..],
-                            tile_mode,
+                            peniko_to_skia_extend_to_tile_mode(gradient.extend),
                             interpolation,
                             &brush_transform.map(|it| kurbo_affine_to_skia_matrix(it)),
                         )
@@ -395,7 +385,7 @@ fn anyrender_brush_to_skia_paint<'a>(
                             (end_center, end_radius),
                             (&colors[..], None),
                             &positions[..],
-                            tile_mode,
+                            peniko_to_skia_extend_to_tile_mode(gradient.extend),
                             interpolation,
                             &brush_transform.map(|it| kurbo_affine_to_skia_matrix(it)),
                         )
@@ -412,12 +402,6 @@ fn anyrender_brush_to_skia_paint<'a>(
                     }
                     let center = skpt(sweep_gradient_position.center);
 
-                    let tile_mode = match gradient.extend {
-                        peniko::Extend::Pad => TileMode::Clamp,
-                        peniko::Extend::Repeat => TileMode::Repeat,
-                        peniko::Extend::Reflect => TileMode::Mirror,
-                    };
-
                     let interpolation = Interpolation {
                         color_space: peniko_to_skia_cs_tag_to_interpol_cs(
                             gradient.interpolation_cs,
@@ -432,7 +416,7 @@ fn anyrender_brush_to_skia_paint<'a>(
                         center,
                         (&colors[..], None),
                         &positions[..],
-                        tile_mode,
+                        peniko_to_skia_extend_to_tile_mode(gradient.extend),
                         (
                             rad_to_deg(sweep_gradient_position.start_angle),
                             rad_to_deg(sweep_gradient_position.end_angle),
@@ -446,11 +430,49 @@ fn anyrender_brush_to_skia_paint<'a>(
 
             let mut paint = Paint::default();
             paint.set_shader(Some(shader));
-
             paint
-        } // ToDo: implement gradient using paint shader
-        anyrender::Paint::Image(_) => Paint::default(), // ToDo: implement image using paint texture
-        anyrender::Paint::Custom(_) => unreachable!(),  // ToDo: figure out what to do with this
+        }
+        anyrender::Paint::Image(brush) => {
+            let src_image = brush.image;
+
+            let image_info = ImageInfo::new(
+                (src_image.width as i32, src_image.height as i32),
+                match src_image.format {
+                    peniko::ImageFormat::Rgba8 => ColorType::RGBA8888,
+                    peniko::ImageFormat::Bgra8 => ColorType::BGRA8888,
+                    _ => unreachable!(),
+                },
+                match src_image.alpha_type {
+                    peniko::ImageAlphaType::Alpha => AlphaType::Unpremul,
+                    peniko::ImageAlphaType::AlphaPremultiplied => AlphaType::Premul,
+                },
+                None,
+            );
+            let pixels = unsafe {
+                Data::new_bytes(src_image.data.data()) // We have to ensure the src image data lives long enough
+            };
+            let image = skia_safe::images::raster_from_data(
+                &image_info,
+                pixels,
+                image_info.min_row_bytes(),
+            )
+            .unwrap();
+
+            let shader = shaders::image(
+                image,
+                (
+                    peniko_to_skia_extend_to_tile_mode(brush.sampler.x_extend),
+                    peniko_to_skia_extend_to_tile_mode(brush.sampler.y_extend),
+                ),
+                &SamplingOptions::default(),
+                &brush_transform.map(|it| kurbo_affine_to_skia_matrix(it)),
+            );
+
+            let mut paint = Paint::default();
+            paint.set_shader(shader);
+            paint
+        }
+        anyrender::Paint::Custom(_) => unreachable!(), // ToDo: figure out what to do with this
     }
 }
 
@@ -460,6 +482,14 @@ fn rad_to_deg(rad: f32) -> f32 {
     }
 
     rad * 180.0 / std::f32::consts::PI
+}
+
+fn peniko_to_skia_extend_to_tile_mode(extend: peniko::Extend) -> TileMode {
+    match extend {
+        peniko::Extend::Pad => TileMode::Clamp,
+        peniko::Extend::Repeat => TileMode::Repeat,
+        peniko::Extend::Reflect => TileMode::Mirror,
+    }
 }
 
 fn peniko_to_skia_hue_direction_to_hue_method(
