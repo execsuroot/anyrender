@@ -1,10 +1,24 @@
 use std::sync::Arc;
 
 use skia_safe::{
-    gpu::{direct_contexts, ganesh::vk::backend_render_targets, surfaces, vk::{self, Format}, DirectContext, SurfaceOrigin}, Canvas, ColorType, Surface
+    Canvas, ColorType, Surface,
+    gpu::{
+        DirectContext, SurfaceOrigin, direct_contexts,
+        ganesh::vk::backend_render_targets,
+        surfaces,
+        vk::{self, Format},
+    },
 };
 use vulkano::{
-    device::{Queue, QueueCreateInfo}, image::view::ImageView, render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass}, swapchain::{acquire_next_image, Swapchain, SwapchainAcquireFuture, SwapchainCreateInfo, SwapchainPresentInfo}, sync::GpuFuture, Handle, Validated, VulkanError, VulkanObject
+    Handle, Validated, VulkanError, VulkanObject,
+    device::{Queue, QueueCreateInfo},
+    image::view::ImageView,
+    render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass},
+    swapchain::{
+        Swapchain, SwapchainAcquireFuture, SwapchainCreateInfo, SwapchainPresentInfo,
+        acquire_next_image,
+    },
+    sync::GpuFuture,
 };
 
 use crate::window_renderer::SkiaBackend;
@@ -22,7 +36,11 @@ pub(crate) struct VulkanBackend {
 }
 
 impl VulkanBackend {
-    pub(crate) fn new(window: Arc<dyn anyrender::WindowHandle>, width: u32, height: u32) -> VulkanBackend {
+    pub(crate) fn new(
+        window: Arc<dyn anyrender::WindowHandle>,
+        width: u32,
+        height: u32,
+    ) -> VulkanBackend {
         let library = vulkano::VulkanLibrary::new().expect("vulkan library is available on system");
 
         let required_extensions =
@@ -244,10 +262,7 @@ impl VulkanBackend {
         }
     }
 
-    fn create_surface_for_framebuffer(
-        &mut self,
-        framebuffer: Arc<Framebuffer>
-    ) -> Surface {
+    fn create_surface_for_framebuffer(&mut self, framebuffer: Arc<Framebuffer>) -> Surface {
         let [width, height] = framebuffer.extent();
         let image_access = &framebuffer.attachments()[0];
         let image_object = image_access.image().handle().as_raw();
@@ -255,10 +270,9 @@ impl VulkanBackend {
         let format = image_access.format();
 
         let (vk_format, color_type) = match format {
-            vulkano::format::Format::B8G8R8A8_UNORM => (
-                vk::Format::B8G8R8A8_UNORM,
-                ColorType::BGRA8888
-            ),
+            vulkano::format::Format::B8G8R8A8_UNORM => {
+                (vk::Format::B8G8R8A8_UNORM, ColorType::BGRA8888)
+            }
             _ => panic!("Unsupported color format: {format:?}"),
         };
 
@@ -274,11 +288,12 @@ impl VulkanBackend {
                 None,
                 None,
                 None,
-                None
+                None,
             )
         };
 
-        let render_target = &backend_render_targets::make_vk((width as i32, height as i32), image_info);
+        let render_target =
+            &backend_render_targets::make_vk((width as i32, height as i32), image_info);
 
         surfaces::wrap_backend_render_target(
             &mut self.gr_context,
@@ -286,8 +301,9 @@ impl VulkanBackend {
             SurfaceOrigin::TopLeft,
             color_type,
             None,
-            None
-        ).unwrap()
+            None,
+        )
+        .unwrap()
     }
 }
 
@@ -309,7 +325,11 @@ impl SkiaBackend for VulkanBackend {
 
         if let Some((image_index, acquire_future)) = next_frame {
             self.prepared = Some((image_index, acquire_future));
-            return Some(self.create_surface_for_framebuffer(self.framebuffers[image_index as usize].clone()));
+            return Some(
+                self.create_surface_for_framebuffer(
+                    self.framebuffers[image_index as usize].clone(),
+                ),
+            );
         } else {
             None
         }
@@ -328,10 +348,7 @@ impl SkiaBackend for VulkanBackend {
             .join(acquire_future)
             .then_swapchain_present(
                 self.queue.clone(),
-                SwapchainPresentInfo::swapchain_image_index(
-                    self.swapchain.clone(),
-                    image_index
-                ),
+                SwapchainPresentInfo::swapchain_image_index(self.swapchain.clone(), image_index),
             )
             .then_signal_fence_and_flush()
             .map(|f| Box::new(f) as _)

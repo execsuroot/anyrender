@@ -3,7 +3,15 @@ use std::collections::HashMap;
 use anyrender::PaintScene;
 use peniko::{StyleRef, color::DynamicColor};
 use skia_safe::{
-    canvas::{GlyphPositions, SaveLayerRec}, font::Edging, font_arguments::{variation_position::Coordinate, VariationPosition}, gradient_shader::{interpolation, Interpolation}, image_filters::{self, CropRect}, shaders, AlphaType, BlendMode, Canvas, Color, Color4f, ColorType, Data, Font, FontArguments, FontHinting, FontMgr, GlyphId, ImageInfo, Matrix, Paint, PaintCap, PaintJoin, PaintStyle, Point, RRect, Rect, SamplingOptions, Shader, Surface, TileMode, Typeface
+    AlphaType, BlendMode, Canvas, Color, Color4f, ColorType, Data, Font, FontArguments,
+    FontHinting, FontMgr, GlyphId, ImageInfo, Matrix, Paint, PaintCap, PaintJoin, PaintStyle,
+    Point, RRect, Rect, SamplingOptions, Shader, Surface, TileMode, Typeface,
+    canvas::{GlyphPositions, SaveLayerRec},
+    font::Edging,
+    font_arguments::{VariationPosition, variation_position::Coordinate},
+    gradient_shader::{Interpolation, interpolation},
+    image_filters::{self, CropRect},
+    shaders,
 };
 
 pub struct SkiaScenePainter<'a> {
@@ -104,8 +112,7 @@ impl PaintScene for SkiaScenePainter<'_> {
             .set_matrix(&kurbo_affine_to_skia_matrix(transform).into());
 
         if let Some(affine) = glyph_transform {
-            self.inner
-                .concat(&kurbo_affine_to_skia_matrix(affine));
+            self.inner.concat(&kurbo_affine_to_skia_matrix(affine));
         }
 
         let mut paint = anyrender_brush_to_skia_paint(brush.into(), None);
