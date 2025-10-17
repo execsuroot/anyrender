@@ -3,6 +3,7 @@ mod scene;
 mod window_renderer;
 
 // Backends
+#[cfg(target_os = "macos")]
 mod metal;
 mod opengl;
 mod vulkan;
