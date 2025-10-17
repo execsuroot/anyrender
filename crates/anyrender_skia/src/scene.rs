@@ -149,11 +149,12 @@ impl PaintScene for SkiaScenePainter<'_> {
                 let coordinates: Vec<Coordinate> = axes
                     .iter()
                     .zip(normalized_coords.iter())
-                    .map(|(axis_param, &raw_value)| {
-                        let value = f2dot14_to_f32(raw_value);
+                    .map(|(axis, &raw_value)| {
+                        let factor = f2dot14_to_f32(raw_value);
+                        let value = axis.min + ((axis.max - axis.min) * factor);
 
                         Coordinate {
-                            axis: axis_param.tag,
+                            axis: axis.tag,
                             value,
                         }
                     })
