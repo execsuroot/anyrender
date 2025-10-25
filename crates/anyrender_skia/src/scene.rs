@@ -4,13 +4,12 @@ use anyrender::PaintScene;
 use peniko::{StyleRef, color::DynamicColor};
 use skia_safe::{
     AlphaType, BlendMode, Canvas, Color, Color4f, ColorType, Data, Font, FontArguments,
-    FontHinting, FontMgr, GlyphId, ImageInfo, Matrix, Paint, PaintCap, PaintJoin, PaintStyle,
-    Point, RRect, Rect, SamplingOptions, Shader, TileMode, Typeface,
+    FontHinting, FontMgr, GlyphId, ImageInfo, MaskFilter, Matrix, Paint, PaintCap, PaintJoin,
+    PaintStyle, Point, RRect, Rect, SamplingOptions, Shader, TileMode, Typeface,
     canvas::{GlyphPositions, SaveLayerRec},
     font::Edging,
     font_arguments::{VariationPosition, variation_position::Coordinate},
     gradient_shader::{Interpolation, interpolation},
-    image_filters::{self, CropRect},
     shaders,
 };
 
@@ -240,15 +239,11 @@ impl PaintScene for SkiaScenePainter<'_> {
         );
         paint.set_style(PaintStyle::Fill);
 
-        paint.set_image_filter(
-            image_filters::blur(
-                (std_dev as f32, std_dev as f32),
-                None,
-                None,
-                CropRect::NO_CROP_RECT,
-            )
-            .unwrap(),
-        );
+        if std_dev > 0.0 {
+            paint.set_mask_filter(
+                MaskFilter::blur(skia_safe::BlurStyle::Normal, std_dev as f32, false).unwrap(),
+            );
+        }
 
         let rrect = RRect::new_nine_patch(
             Rect::new(
