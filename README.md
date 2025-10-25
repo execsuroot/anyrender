@@ -31,7 +31,7 @@ Currently existing backends are:
 - [anyrender_vello](https://docs.rs/anyrender_vello) which draws using [vello](https://docs.rs/vello)
 - [anyrender_vello_cpu](https://docs.rs/anyrender_vello_cpu) which draws using [vello_cpu](https://docs.rs/vello_cpu)
 - [anyrender_vello_hybrid](https://docs.rs/anyrender_vello_hybrid) which draws using [vello_hybrid](https://docs.rs/vello_hybrid)
-- [anyrender_skia](https://docs.rs/anyrender_skia)<sup><b>BETA</b></sup> which draws using Skia (via the [skia-safe](https://github.com/rust-skia/rust-skia) crate)
+- [anyrender_skia](https://crates.io/crates/anyrender_skia)<sup><b>BETA</b></sup> which draws using Skia (via the [skia-safe](https://github.com/rust-skia/rust-skia) crate)
 
 Contributions for other backends (tiny-skia, femtovg, etc) would be very welcome.
 
