@@ -31,8 +31,9 @@ Currently existing backends are:
 - [anyrender_vello](https://docs.rs/anyrender_vello) which draws using [vello](https://docs.rs/vello)
 - [anyrender_vello_cpu](https://docs.rs/anyrender_vello_cpu) which draws using [vello_cpu](https://docs.rs/vello_cpu)
 - [anyrender_vello_hybrid](https://docs.rs/anyrender_vello_hybrid) which draws using [vello_hybrid](https://docs.rs/vello_hybrid)
+- [anyrender_skia](https://docs.rs/anyrender_skia)<sup><b>BETA</b></sup> which draws using Skia (via the [skia-safe](https://github.com/rust-skia/rust-skia) crate)
 
-Contributions for other backends (Skia, FemtoVG, etc) would be very welcome.
+Contributions for other backends (tiny-skia, femtovg, etc) would be very welcome.
 
 ### Content renderers
 
@@ -70,7 +71,6 @@ Contributions are welcome by pull request. The [Rust code of conduct] applies.
 
 Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as defined in the Apache-2.0 license, shall be licensed as above, without any additional terms or conditions.
 
-[color]: https://crates.io/crates/color
 [kurbo]: https://crates.io/crates/kurbo
 [Rust Code of Conduct]: https://www.rust-lang.org/policies/code-of-conduct
 
