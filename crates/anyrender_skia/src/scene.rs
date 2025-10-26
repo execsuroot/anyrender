@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use anyrender::PaintScene;
 use peniko::{StyleRef, color::DynamicColor};
 use skia_safe::{
-    AlphaType, BlendMode, Canvas, Color, Color4f, ColorType, Data, Font, FontArguments,
-    FontHinting, FontMgr, GlyphId, ImageInfo, MaskFilter, Matrix, Paint, PaintCap, PaintJoin,
-    PaintStyle, Point, RRect, Rect, SamplingOptions, Shader, TileMode, Typeface,
+    AlphaType, BlendMode, Canvas, Color, Color4f, ColorType, Data, FilterMode, Font, FontArguments,
+    FontHinting, FontMgr, GlyphId, ImageInfo, MaskFilter, Matrix, MipmapMode, Paint, PaintCap,
+    PaintJoin, PaintStyle, Point, RRect, Rect, SamplingOptions, Shader, TileMode, Typeface,
     canvas::{GlyphPositions, SaveLayerRec},
     font::Edging,
     font_arguments::{VariationPosition, variation_position::Coordinate},
@@ -505,7 +505,11 @@ fn anyrender_brush_to_skia_paint<'a>(
                     peniko_to_skia_extend_to_tile_mode(brush.sampler.x_extend),
                     peniko_to_skia_extend_to_tile_mode(brush.sampler.y_extend),
                 ),
-                &SamplingOptions::default(),
+                &SamplingOptions {
+                    filter: FilterMode::Linear,
+                    mipmap: MipmapMode::Linear,
+                    ..SamplingOptions::default()
+                },
                 &brush_transform.map(kurbo_affine_to_skia_matrix),
             );
 
