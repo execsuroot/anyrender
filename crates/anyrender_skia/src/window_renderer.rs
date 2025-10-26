@@ -1,10 +1,9 @@
-use std::sync::Arc;
-
 use anyrender::WindowRenderer;
 use debug_timer::debug_timer;
 use skia_safe::{Color, Surface};
+use std::sync::Arc;
 
-use crate::scene::{ResourceCache, SkiaScenePainter};
+use crate::{SkiaScenePainter, scene::SkiaSceneCache};
 
 pub(crate) trait SkiaBackend {
     fn set_size(&mut self, width: u32, height: u32);
@@ -15,13 +14,13 @@ pub(crate) trait SkiaBackend {
 }
 
 enum RenderState {
-    Active(ActiveRenderState),
+    Active(Box<ActiveRenderState>),
     Suspended,
 }
 
 struct ActiveRenderState {
     backend: Box<dyn SkiaBackend>,
-    resource_cache: ResourceCache,
+    scene_cache: SkiaSceneCache,
 }
 
 pub struct SkiaWindowRenderer {
@@ -56,10 +55,10 @@ impl WindowRenderer for SkiaWindowRenderer {
         #[cfg(not(target_os = "macos"))]
         let backend = crate::opengl::OpenGLBackend::new(window, width, height);
 
-        self.render_state = RenderState::Active(ActiveRenderState {
+        self.render_state = RenderState::Active(Box::new(ActiveRenderState {
             backend: Box::new(backend),
-            resource_cache: ResourceCache::new(),
-        })
+            scene_cache: SkiaSceneCache::default(),
+        }))
     }
 
     fn suspend(&mut self) {
@@ -93,12 +92,15 @@ impl WindowRenderer for SkiaWindowRenderer {
 
         draw_fn(&mut SkiaScenePainter {
             inner: surface.canvas(),
-            cache: &mut state.resource_cache,
+            cache: &mut state.scene_cache,
         });
         timer.record_time("cmd");
 
         state.backend.flush(surface);
         timer.record_time("render");
+
+        state.scene_cache.next_gen();
+        timer.record_time("cache next gen");
 
         timer.print_times("skia: ");
     }

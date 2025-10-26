@@ -3,6 +3,7 @@ mod scene;
 mod window_renderer;
 
 // Backends
+mod cache;
 #[cfg(target_os = "macos")]
 mod metal;
 #[cfg(not(target_os = "macos"))]
