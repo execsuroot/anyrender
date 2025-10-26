@@ -75,7 +75,6 @@ impl PaintScene for SkiaScenePainter<'_> {
         brush_transform: Option<kurbo::Affine>,
         shape: &impl kurbo::Shape,
     ) {
-        self.inner.save();
         self.inner
             .set_matrix(&kurbo_affine_to_skia_matrix(transform).into());
 
@@ -84,8 +83,6 @@ impl PaintScene for SkiaScenePainter<'_> {
         paint.set_anti_alias(true);
 
         draw_kurbo_shape_to_skia_canvas(self.inner, shape, &paint, None);
-
-        self.inner.restore();
     }
 
     fn fill<'a>(
@@ -96,7 +93,6 @@ impl PaintScene for SkiaScenePainter<'_> {
         brush_transform: Option<kurbo::Affine>,
         shape: &impl kurbo::Shape,
     ) {
-        self.inner.save();
         self.inner
             .set_matrix(&kurbo_affine_to_skia_matrix(transform).into());
 
@@ -105,8 +101,6 @@ impl PaintScene for SkiaScenePainter<'_> {
         paint.set_anti_alias(true);
 
         draw_kurbo_shape_to_skia_canvas(self.inner, shape, &paint, Some(style));
-
-        self.inner.restore();
     }
 
     fn draw_glyphs<'a, 's: 'a>(
@@ -122,7 +116,6 @@ impl PaintScene for SkiaScenePainter<'_> {
         glyph_transform: Option<kurbo::Affine>,
         glyphs: impl Iterator<Item = anyrender::Glyph>,
     ) {
-        self.inner.save();
         self.inner
             .set_matrix(&kurbo_affine_to_skia_matrix(transform).into());
 
@@ -258,8 +251,6 @@ impl PaintScene for SkiaScenePainter<'_> {
             &font,
             &paint,
         );
-
-        self.inner.restore();
     }
 
     fn draw_box_shadow(
@@ -270,7 +261,6 @@ impl PaintScene for SkiaScenePainter<'_> {
         radius: f64,
         std_dev: f64,
     ) {
-        self.inner.save();
         self.inner
             .set_matrix(&kurbo_affine_to_skia_matrix(transform).into());
 
@@ -307,8 +297,6 @@ impl PaintScene for SkiaScenePainter<'_> {
         );
 
         self.inner.draw_rrect(rrect, &paint);
-
-        self.inner.restore();
     }
 }
 
