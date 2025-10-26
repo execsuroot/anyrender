@@ -100,6 +100,6 @@ impl WindowRenderer for SkiaWindowRenderer {
         state.backend.flush(surface);
         timer.record_time("render");
 
-        timer.print_times("Frame time: ");
+        timer.print_times("skia: ");
     }
 }
