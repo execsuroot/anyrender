@@ -7,14 +7,19 @@ use skia_safe::{
     font_arguments::{VariationPosition, variation_position::Coordinate},
 };
 
-use crate::cache::GenerationalCache;
+use crate::cache::{
+    FontCacheKey, FontCacheKeyBorrowed, GenerationalCache, NormalizedTypefaceCacheKey,
+    NormalizedTypefaceCacheKeyBorrowed,
+};
 
 pub(crate) struct SkiaSceneCache {
     paint: Paint,
     #[cfg(target_os = "macos")]
     extracted_font_data: GenerationalCache<(u64, u32), peniko::FontData>,
     typeface: GenerationalCache<(u64, u32), Typeface>,
+    normalized_typeface: GenerationalCache<NormalizedTypefaceCacheKey, Typeface>,
     image_shader: GenerationalCache<u64, Shader>,
+    font: GenerationalCache<FontCacheKey, Font>,
     font_mgr: FontMgr,
     glyph_id_buf: Vec<GlyphId>,
     glyph_pos_buf: Vec<Point>,
@@ -23,7 +28,9 @@ pub(crate) struct SkiaSceneCache {
 impl SkiaSceneCache {
     pub(crate) fn next_gen(&mut self) {
         self.typeface.next_gen();
+        self.normalized_typeface.next_gen();
         self.image_shader.next_gen();
+        self.font.next_gen();
     }
 }
 
@@ -34,7 +41,9 @@ impl Default for SkiaSceneCache {
             #[cfg(target_os = "macos")]
             extracted_font_data: GenerationalCache::new(1),
             typeface: GenerationalCache::new(60), // Keep this high until we figure out a fix for skia_safe fontmgr cache leak
+            normalized_typeface: GenerationalCache::new(60), // Keep this high until we figure out a fix for skia_safe fontmgr cache leak
             image_shader: GenerationalCache::new(1),
+            font: GenerationalCache::new(60), // Keep this high until we figure out a fix for skia_safe fontmgr cache leak
             font_mgr: FontMgr::new(),
             glyph_id_buf: Default::default(),
             glyph_pos_buf: Default::default(),
@@ -332,8 +341,8 @@ impl PaintScene for SkiaScenePainter<'_> {
             self.cache.typeface.insert(font_key, typeface);
         }
 
-        let original_typeface = self.cache.typeface.hit(&font_key).unwrap();
-        let mut normalized_typeface: Option<Typeface> = None;
+        let original_typeface: &Typeface = self.cache.typeface.hit(&font_key).unwrap();
+        let mut normalized_typeface: Option<&Typeface> = None;
 
         fn f2dot14_to_f32(raw_value: i16) -> f32 {
             let int = (raw_value >> 14) as f32;
@@ -346,49 +355,94 @@ impl PaintScene for SkiaScenePainter<'_> {
                 .variation_design_parameters()
                 .unwrap_or_default();
             if !axes.is_empty() {
-                let coordinates: Vec<Coordinate> = axes
-                    .iter()
-                    .zip(normalized_coords.iter().map(|c| f2dot14_to_f32(*c)))
-                    .filter(|(_, value)| *value != 0.0)
-                    .map(|(axis, factor)| {
-                        let value = if factor < 0.0 {
-                            lerp_f32(axis.min, axis.def, -factor)
-                        } else {
-                            lerp_f32(axis.def, axis.max, factor)
-                        };
-
-                        Coordinate {
-                            axis: axis.tag,
-                            value,
-                        }
-                    })
-                    .collect();
-                let variation_position = VariationPosition {
-                    coordinates: &coordinates,
+                let normalized_typeface_cache_key_borrowed = NormalizedTypefaceCacheKeyBorrowed {
+                    typeface_id: font.data.id(),
+                    typeface_index: font.index,
+                    normalized_coords,
                 };
 
+                if !self
+                    .cache
+                    .normalized_typeface
+                    .contains_key(&normalized_typeface_cache_key_borrowed)
+                {
+                    let coordinates: Vec<Coordinate> = axes
+                        .iter()
+                        .zip(normalized_coords.iter().map(|c| f2dot14_to_f32(*c)))
+                        .filter(|(_, value)| *value != 0.0)
+                        .map(|(axis, factor)| {
+                            let value = if factor < 0.0 {
+                                lerp_f32(axis.min, axis.def, -factor)
+                            } else {
+                                lerp_f32(axis.def, axis.max, factor)
+                            };
+
+                            Coordinate {
+                                axis: axis.tag,
+                                value,
+                            }
+                        })
+                        .collect();
+                    let variation_position = VariationPosition {
+                        coordinates: &coordinates,
+                    };
+
+                    self.cache.normalized_typeface.insert(
+                        NormalizedTypefaceCacheKey {
+                            typeface_id: font.data.id(),
+                            typeface_index: font.index,
+                            normalized_coords: normalized_coords.to_vec(),
+                        },
+                        original_typeface
+                            .clone_with_arguments(
+                                &FontArguments::new()
+                                    .set_variation_design_position(variation_position),
+                            )
+                            .unwrap(),
+                    );
+                }
+
                 normalized_typeface = Some(
-                    original_typeface
-                        .clone_with_arguments(
-                            &FontArguments::new().set_variation_design_position(variation_position),
-                        )
+                    self.cache
+                        .normalized_typeface
+                        .hit(&normalized_typeface_cache_key_borrowed)
                         .unwrap(),
-                );
+                )
             }
         }
 
-        let typeface = match &normalized_typeface {
-            Some(it) => it,
-            None => original_typeface,
+        let typeface: &Typeface = normalized_typeface.unwrap_or(original_typeface);
+
+        let font_cache_key_borrowed = FontCacheKeyBorrowed {
+            typeface_id: font.data.id(),
+            typeface_index: font.index,
+            normalized_coords,
+            font_size: font_size.to_bits(),
+            hint,
         };
 
-        let mut font = Font::from_typeface(typeface, font_size);
-        font.set_hinting(if hint {
-            FontHinting::Normal
-        } else {
-            FontHinting::None
-        });
-        font.set_edging(Edging::SubpixelAntiAlias);
+        if !self.cache.font.contains_key(&font_cache_key_borrowed) {
+            let mut font_to_cache = Font::from_typeface(typeface, font_size);
+            font_to_cache.set_hinting(if hint {
+                FontHinting::Normal
+            } else {
+                FontHinting::None
+            });
+            font_to_cache.set_edging(Edging::SubpixelAntiAlias);
+
+            self.cache.font.insert(
+                FontCacheKey {
+                    typeface_id: font.data.id(),
+                    typeface_index: font.index,
+                    normalized_coords: normalized_coords.to_vec(),
+                    font_size: font_size.to_bits(),
+                    hint,
+                },
+                font_to_cache,
+            );
+        }
+
+        let font = self.cache.font.hit(&font_cache_key_borrowed).unwrap();
 
         let (min_size, _) = glyphs.size_hint();
         self.cache.glyph_id_buf.reserve(min_size);
@@ -403,7 +457,7 @@ impl PaintScene for SkiaScenePainter<'_> {
             &self.cache.glyph_id_buf[..],
             GlyphPositions::Points(&self.cache.glyph_pos_buf[..]),
             Point::new(0.0, 0.0),
-            &font,
+            font,
             &self.cache.paint,
         );
 
