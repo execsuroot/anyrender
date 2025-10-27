@@ -49,6 +49,14 @@ where
         self.current_generation = self.current_generation.wrapping_add(1);
     }
 
+    #[allow(unused)]
+    pub(crate) fn contains_key<Q>(&mut self, key: &Q) -> bool
+    where
+        Q: Hash + Equivalent<K> + ?Sized,
+    {
+        self.resources.contains_key(key)
+    }
+
     pub(crate) fn hit<Q>(&mut self, key: &Q) -> Option<&T>
     where
         Q: Hash + Equivalent<K> + ?Sized,

@@ -303,7 +303,10 @@ impl SkiaScenePainter<'_> {
         Some(normalized_typeface)
     }
 
-    fn get_or_cache_typeface(&mut self, font: &peniko::FontData) -> Option<Typeface> {
+    fn get_or_cache_typeface<'a>(
+        &'a mut self,
+        #[allow(unused_mut)] mut font: &'a peniko::FontData,
+    ) -> Option<Typeface> {
         let cache_key = (font.data.id(), font.index);
 
         #[cfg(target_os = "macos")]
