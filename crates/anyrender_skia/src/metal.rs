@@ -10,6 +10,7 @@ use skia_safe::{
     gpu::{self, DirectContext, SurfaceOrigin, backend_render_targets, mtl},
     scalar,
 };
+use tracing::{instrument, Level};
 
 use crate::window_renderer::SkiaBackend;
 
@@ -67,6 +68,11 @@ impl MetalBackend {
             prepared_drawable: None,
         }
     }
+
+    #[instrument(skip_all, level = Level::INFO)]
+    pub fn next_drawable(&self) -> Option<Retained<ProtocolObject<dyn CAMetalDrawable>>> {
+        self.metal_layer.nextDrawable()
+    }
 }
 
 impl SkiaBackend for MetalBackend {
@@ -75,8 +81,9 @@ impl SkiaBackend for MetalBackend {
             .setDrawableSize(CGSize::new(width as f64, height as f64));
     }
 
+    #[instrument(skip_all, level = Level::INFO)]
     fn prepare(&mut self) -> Option<Surface> {
-        let drawable = self.metal_layer.nextDrawable()?;
+        let drawable = self.next_drawable()?;
 
         let (drawable_width, drawable_height) = {
             let size = self.metal_layer.drawableSize();
