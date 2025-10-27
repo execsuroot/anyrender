@@ -226,14 +226,18 @@ impl PaintScene for SkiaScenePainter<'_> {
         self.reset_paint();
         self.set_paint_alpha(alpha);
         self.set_paint_blend_mode(blend);
-        self.inner
-            .save_layer(&SaveLayerRec::default().paint(&self.cache.paint));
+
+        self.inner.save();
 
         self.set_matrix(transform);
         self.clip(clip);
+
+        self.inner
+            .save_layer(&SaveLayerRec::default().paint(&self.cache.paint));
     }
 
     fn pop_layer(&mut self) {
+        self.inner.restore();
         self.inner.restore();
     }
 
