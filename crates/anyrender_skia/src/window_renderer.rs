@@ -2,8 +2,9 @@ use anyrender::WindowRenderer;
 use debug_timer::debug_timer;
 use skia_safe::{Color, Surface};
 use std::sync::Arc;
+use tracing_subscriber::layer::SubscriberExt;
 
-use crate::{SkiaScenePainter, scene::SkiaSceneCache};
+use crate::{profiler, scene::SkiaSceneCache, SkiaScenePainter};
 
 pub(crate) trait SkiaBackend {
     fn set_size(&mut self, width: u32, height: u32);
@@ -35,6 +36,10 @@ impl Default for SkiaWindowRenderer {
 
 impl SkiaWindowRenderer {
     pub fn new() -> Self {
+        let subscriber = tracing_subscriber::registry().with(profiler::ProfilingLayer);
+        tracing::subscriber::set_global_default(subscriber)
+            .expect("setting default subscriber failed");
+
         Self {
             render_state: RenderState::Suspended,
         }
@@ -73,6 +78,7 @@ impl WindowRenderer for SkiaWindowRenderer {
         if let RenderState::Active(state) = &mut self.render_state {
             state.backend.set_size(width, height);
         }
+        profiler::print_summary();
     }
 
     fn render<F: FnOnce(&mut Self::ScenePainter<'_>)>(&mut self, draw_fn: F) {

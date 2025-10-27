@@ -1,4 +1,5 @@
 use anyrender::PaintScene;
+use debug_timer::RealDebugTimer;
 use skia_safe::{
     BlurStyle, Canvas, Color, ColorSpace, Font, FontArguments, FontHinting, FontMgr, GlyphId,
     MaskFilter, Paint, PaintCap, PaintJoin, PaintStyle, Point, RRect, Rect, Shader, Typeface,
@@ -6,6 +7,7 @@ use skia_safe::{
     font::Edging,
     font_arguments::{VariationPosition, variation_position::Coordinate},
 };
+use tracing::{instrument, Level};
 
 use crate::cache::{
     FontCacheKey, FontCacheKeyBorrowed, GenerationalCache, NormalizedTypefaceCacheKey,
@@ -212,10 +214,12 @@ impl SkiaScenePainter<'_> {
 }
 
 impl PaintScene for SkiaScenePainter<'_> {
+    #[instrument(skip_all, level = Level::INFO)]
     fn reset(&mut self) {
         self.inner.clear(Color::WHITE);
     }
 
+    #[instrument(skip_all, level = Level::INFO)]
     fn push_layer(
         &mut self,
         blend: impl Into<peniko::BlendMode>,
@@ -233,10 +237,12 @@ impl PaintScene for SkiaScenePainter<'_> {
         self.clip(clip);
     }
 
+    #[instrument(skip_all, level = Level::INFO)]
     fn pop_layer(&mut self) {
         self.inner.restore();
     }
 
+    #[instrument(skip_all, level = Level::INFO)]
     fn stroke<'a>(
         &mut self,
         style: &kurbo::Stroke,
@@ -253,6 +259,7 @@ impl PaintScene for SkiaScenePainter<'_> {
         self.draw_shape(shape);
     }
 
+    #[instrument(skip_all, level = Level::INFO)]
     fn fill<'a>(
         &mut self,
         style: peniko::Fill,
@@ -269,6 +276,7 @@ impl PaintScene for SkiaScenePainter<'_> {
         self.draw_shape_with_fill(shape, style);
     }
 
+    #[instrument(skip_all, level = Level::INFO)]
     fn draw_glyphs<'a, 's: 'a>(
         &'s mut self,
         #[allow(unused_mut)] mut font: &'a peniko::FontData,
@@ -465,6 +473,7 @@ impl PaintScene for SkiaScenePainter<'_> {
         self.cache.glyph_pos_buf.clear();
     }
 
+    #[instrument(skip_all, level = Level::INFO)]
     fn draw_box_shadow(
         &mut self,
         transform: kurbo::Affine,
