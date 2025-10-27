@@ -61,7 +61,7 @@ pub struct SkiaScenePainter<'a> {
 impl SkiaScenePainter<'_> {
     #[instrument(skip_all)]
     fn reset_paint(&mut self) {
-        self.cache.paint.reset();Yea
+        self.cache.paint.reset();
     }
 
     #[instrument(skip_all)]
@@ -239,15 +239,21 @@ impl PaintScene for SkiaScenePainter<'_> {
         self.reset_paint();
         self.set_paint_alpha(alpha);
         self.set_paint_blend_mode(blend);
-        self.inner
-            .save_layer(&SaveLayerRec::default().paint(&self.cache.paint));
+
+        self.inner.save();
 
         self.set_matrix(transform);
         self.clip(clip);
+
+        self.inner
+            .save_layer(&SaveLayerRec::default().paint(&self.cache.paint));
+
+
     }
 
     #[instrument(skip_all, level = Level::INFO)]
     fn pop_layer(&mut self) {
+        self.inner.restore();
         self.inner.restore();
     }
 
