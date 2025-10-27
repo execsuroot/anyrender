@@ -78,7 +78,6 @@ impl WindowRenderer for SkiaWindowRenderer {
         if let RenderState::Active(state) = &mut self.render_state {
             state.backend.set_size(width, height);
         }
-        profiler::print_summary();
     }
 
     fn render<F: FnOnce(&mut Self::ScenePainter<'_>)>(&mut self, draw_fn: F) {
@@ -93,8 +92,13 @@ impl WindowRenderer for SkiaWindowRenderer {
             None => return,
         };
 
+        timer.record_time("prepare");
+
         surface.canvas().restore_to_count(1);
+        timer.record_time("restore");
+        
         surface.canvas().clear(Color::WHITE);
+        timer.record_time("clear");
 
         draw_fn(&mut SkiaScenePainter {
             inner: surface.canvas(),
@@ -109,5 +113,6 @@ impl WindowRenderer for SkiaWindowRenderer {
         timer.record_time("cache next gen");
 
         timer.print_times("skia: ");
+        profiler::print_summary();
     }
 }

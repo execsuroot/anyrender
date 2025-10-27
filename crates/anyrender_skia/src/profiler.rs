@@ -18,15 +18,17 @@ pub fn record_duration(name: &str, duration: Duration) {
 
 pub fn print_summary() {
     println!("--- Function Execution Summary ---");
-    let map = FUNCTION_DURATIONS.lock().unwrap();
+    let mut map = FUNCTION_DURATIONS.lock().unwrap();
     let mut sorted_times: Vec<(&String, &Duration)> = map.iter().collect();
     sorted_times.sort_by(|a, b| b.1.cmp(a.1));
 
     for (name, duration) in sorted_times {
-        let total_seconds = duration.as_secs_f64();
-        println!("| {name} | Total Time: {:.3}s", total_seconds);
+        let total_seconds = duration.as_micros();
+        println!("| {name} | Total Time: {}us", total_seconds);
     }
     println!("----------------------------------");
+
+    map.values_mut().for_each(|d| *d = Duration::new(0, 0));
 }
 
 pub struct ProfilingLayer;
