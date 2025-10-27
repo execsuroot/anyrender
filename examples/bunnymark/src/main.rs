@@ -2,6 +2,7 @@ use anyrender::{PaintScene, WindowRenderer};
 use anyrender_vello::VelloWindowRenderer;
 use anyrender_vello_cpu::VelloCpuWindowRenderer;
 use anyrender_vello_hybrid::VelloHybridWindowRenderer;
+use anyrender_skia::SkiaWindowRenderer;
 use bunny::BunnyManager;
 use kurbo::{Affine, Circle, Point, Rect, Stroke};
 use peniko::{Color, Fill};
@@ -27,6 +28,7 @@ struct App {
 }
 
 enum Renderer {
+    Skia(Box<SkiaWindowRenderer>),
     Gpu(Box<VelloWindowRenderer>),
     Hybrid(Box<VelloHybridWindowRenderer>),
     Cpu(Box<VelloCpuWindowRenderer>),
@@ -35,6 +37,7 @@ enum Renderer {
 impl Renderer {
     fn is_active(&self) -> bool {
         match self {
+            Renderer::Skia(r) => r.is_active(),
             Renderer::Gpu(r) => r.is_active(),
             Renderer::Hybrid(r) => r.is_active(),
             Renderer::Cpu(r) => r.is_active(),
@@ -43,6 +46,7 @@ impl Renderer {
 
     fn set_size(&mut self, w: u32, h: u32) {
         match self {
+            Renderer::Skia(r) => r.set_size(w, h),
             Renderer::Gpu(r) => r.set_size(w, h),
             Renderer::Hybrid(r) => r.set_size(w, h),
             Renderer::Cpu(r) => r.set_size(w, h),
@@ -155,8 +159,8 @@ impl ApplicationHandler for App {
     }
 
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        self.set_backend(VelloHybridWindowRenderer::new(), event_loop, |r| {
-            Renderer::Hybrid(Box::new(r))
+        self.set_backend(SkiaWindowRenderer::new(), event_loop, |r| {
+            Renderer::Skia(Box::new(r))
         });
     }
 
@@ -197,6 +201,7 @@ impl ApplicationHandler for App {
                 self.bunny_manager
                     .update(self.logical_width as f64, self.logical_height as f64);
                 let renderer_name = match renderer {
+                    Renderer::Skia(_) => "skia",
                     Renderer::Gpu(_) => "vello",
                     Renderer::Hybrid(_) => "vello_hybrid",
                     Renderer::Cpu(_) => "vello_cpu",
@@ -207,6 +212,16 @@ impl ApplicationHandler for App {
                     self.bunny_manager.count(),
                 );
                 match renderer {
+                    Renderer::Skia(r) => r.render(|scene_painter| {
+                        App::draw_scene(
+                            scene_painter,
+                            self.logical_width,
+                            self.logical_height,
+                            self.scale_factor,
+                            &self.bunny_manager,
+                            Color::from_rgb8(255, 0, 0),
+                        );
+                    }),
                     Renderer::Gpu(r) => r.render(|scene_painter| {
                         App::draw_scene(
                             scene_painter,
@@ -267,6 +282,11 @@ impl ApplicationHandler for App {
                             });
                         }
                         Renderer::Gpu(_) => {
+                            self.set_backend(SkiaWindowRenderer::new(), event_loop, |r| {
+                                Renderer::Skia(Box::new(r))
+                            });
+                        }
+                        Renderer::Skia(_) => {
                             self.set_backend(VelloCpuWindowRenderer::new(), event_loop, |r| {
                                 Renderer::Cpu(Box::new(r))
                             });
