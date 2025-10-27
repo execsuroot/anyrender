@@ -1,8 +1,8 @@
 use anyrender::{PaintScene, WindowRenderer};
+use anyrender_skia::SkiaWindowRenderer;
 use anyrender_vello::VelloWindowRenderer;
 use anyrender_vello_cpu::VelloCpuWindowRenderer;
 use anyrender_vello_hybrid::VelloHybridWindowRenderer;
-use anyrender_skia::SkiaWindowRenderer;
 use bunny::BunnyManager;
 use kurbo::{Affine, Circle, Point, Rect, Stroke};
 use peniko::{Color, Fill};
