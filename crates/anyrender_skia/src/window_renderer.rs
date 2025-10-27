@@ -96,7 +96,7 @@ impl WindowRenderer for SkiaWindowRenderer {
 
         surface.canvas().restore_to_count(1);
         timer.record_time("restore");
-        
+
         surface.canvas().clear(Color::WHITE);
         timer.record_time("clear");
 

@@ -59,35 +59,41 @@ pub struct SkiaScenePainter<'a> {
 }
 
 impl SkiaScenePainter<'_> {
+    #[instrument(skip_all)]
     fn reset_paint(&mut self) {
-        self.cache.paint.reset();
-        self.cache.paint.set_anti_alias(true);
+        self.cache.paint.reset();Yea
     }
 
+    #[instrument(skip_all)]
     fn set_paint_alpha(&mut self, alpha: f32) {
         self.cache.paint.set_alpha_f(alpha);
     }
 
+    #[instrument(skip_all)]
     fn set_paint_blend_mode(&mut self, blend_mode: impl Into<peniko::BlendMode>) {
         self.cache
             .paint
             .set_blend_mode(sk_peniko::blend_mode_from(blend_mode.into()));
     }
 
+    #[instrument(skip_all)]
     fn set_matrix(&self, transform: kurbo::Affine) {
         self.inner
             .set_matrix(&sk_kurbo::matrix_from_affine(transform).into());
     }
 
+    #[instrument(skip_all)]
     fn concat_matrix(&self, transform: kurbo::Affine) {
         self.inner.concat(&sk_kurbo::matrix_from_affine(transform));
     }
 
+    #[instrument(skip_all)]
     fn clip(&self, clip: &impl kurbo::Shape) {
         self.inner
             .clip_path(&sk_kurbo::path_from_shape(clip), None, true);
     }
 
+    #[instrument(skip_all)]
     fn set_paint_brush<'a>(
         &mut self,
         brush: impl Into<anyrender::PaintRef<'a>>,
@@ -126,6 +132,7 @@ impl SkiaScenePainter<'_> {
         }
     }
 
+    #[instrument(skip_all)]
     fn set_paint_style<'a>(&mut self, style: impl Into<peniko::StyleRef<'a>>) {
         match style.into() {
             peniko::StyleRef::Fill(_) => {
@@ -149,10 +156,12 @@ impl SkiaScenePainter<'_> {
         }
     }
 
+    #[instrument(skip_all)]
     fn draw_shape(&mut self, shape: &impl kurbo::Shape) {
         self.draw_shape_with_fill(shape, None);
     }
 
+    #[instrument(skip_all)]
     fn draw_shape_with_fill(
         &mut self,
         shape: &impl kurbo::Shape,
