@@ -62,6 +62,7 @@ impl SkiaScenePainter<'_> {
     #[instrument(skip_all)]
     fn reset_paint(&mut self) {
         self.cache.paint.reset();
+        self.cache.paint.set_anti_alias(true);
     }
 
     #[instrument(skip_all)]
