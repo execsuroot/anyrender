@@ -1,10 +1,7 @@
-use anyrender::{NullWindowRenderer, PaintScene, WindowRenderer};
+use anyrender::{Glyph, NullWindowRenderer, PaintScene, WindowRenderer};
 use anyrender_skia::SkiaWindowRenderer;
-use anyrender_vello::VelloWindowRenderer;
-use anyrender_vello_cpu::{PixelsWindowRenderer, SoftbufferWindowRenderer, VelloCpuImageRenderer};
-use anyrender_vello_hybrid::VelloHybridWindowRenderer;
 use kurbo::{Affine, Circle, Point, Rect, Stroke};
-use peniko::{Color, Fill};
+use peniko::{Blob, Brush, Color, Fill, FontData, color::AlphaColor};
 use std::sync::Arc;
 use winit::{
     application::ApplicationHandler,
@@ -18,10 +15,8 @@ struct App {
     render_state: RenderState,
     width: u32,
     height: u32,
+    font_data: FontData,
 }
-
-type VelloCpuSBWindowRenderer = SoftbufferWindowRenderer<VelloCpuImageRenderer>;
-type VelloCpuWindowRenderer = PixelsWindowRenderer<VelloCpuImageRenderer>;
 
 type InitialBackend = SkiaWindowRenderer;
 // type InitialBackend = VelloWindowRenderer;
@@ -31,33 +26,10 @@ type InitialBackend = SkiaWindowRenderer;
 // type InitialBackend = NullWindowRenderer;
 
 enum Renderer {
-    Gpu(Box<VelloWindowRenderer>),
-    Hybrid(Box<VelloHybridWindowRenderer>),
-    Cpu(Box<VelloCpuWindowRenderer>),
-    CpuSoftbuffer(Box<VelloCpuSBWindowRenderer>),
     Skia(Box<SkiaWindowRenderer>),
     Null(NullWindowRenderer),
 }
-impl From<VelloWindowRenderer> for Renderer {
-    fn from(renderer: VelloWindowRenderer) -> Self {
-        Self::Gpu(Box::new(renderer))
-    }
-}
-impl From<VelloHybridWindowRenderer> for Renderer {
-    fn from(renderer: VelloHybridWindowRenderer) -> Self {
-        Self::Hybrid(Box::new(renderer))
-    }
-}
-impl From<VelloCpuWindowRenderer> for Renderer {
-    fn from(renderer: VelloCpuWindowRenderer) -> Self {
-        Self::Cpu(Box::new(renderer))
-    }
-}
-impl From<VelloCpuSBWindowRenderer> for Renderer {
-    fn from(renderer: VelloCpuSBWindowRenderer) -> Self {
-        Self::CpuSoftbuffer(Box::new(renderer))
-    }
-}
+
 impl From<SkiaWindowRenderer> for Renderer {
     fn from(renderer: SkiaWindowRenderer) -> Self {
         Self::Skia(Box::new(renderer))
@@ -72,10 +44,6 @@ impl From<NullWindowRenderer> for Renderer {
 impl Renderer {
     fn is_active(&self) -> bool {
         match self {
-            Renderer::Gpu(r) => r.is_active(),
-            Renderer::Hybrid(r) => r.is_active(),
-            Renderer::Cpu(r) => r.is_active(),
-            Renderer::CpuSoftbuffer(r) => r.is_active(),
             Renderer::Null(r) => r.is_active(),
             Renderer::Skia(r) => r.is_active(),
         }
@@ -83,10 +51,6 @@ impl Renderer {
 
     fn set_size(&mut self, w: u32, h: u32) {
         match self {
-            Renderer::Gpu(r) => r.set_size(w, h),
-            Renderer::Hybrid(r) => r.set_size(w, h),
-            Renderer::Cpu(r) => r.set_size(w, h),
-            Renderer::CpuSoftbuffer(r) => r.set_size(w, h),
             Renderer::Null(r) => r.set_size(w, h),
             Renderer::Skia(r) => r.set_size(w, h),
         }
@@ -119,7 +83,7 @@ impl App {
         }
     }
 
-    fn draw_scene<T: PaintScene>(scene: &mut T, color: Color) {
+    fn draw_scene<T: PaintScene>(scene: &mut T, color: Color, font: FontData) {
         scene.fill(
             Fill::NonZero,
             Affine::IDENTITY,
@@ -140,6 +104,24 @@ impl App {
             color,
             None,
             &Circle::new(Point::new(20.0, 20.0), 10.0),
+        );
+
+        let glyphs: Vec<Glyph> = vec![Glyph {
+            id: 3,
+            x: 100f32,
+            y: 100f32,
+        }];
+        scene.draw_glyphs(
+            &font,
+            12f32,
+            true,
+            &[],
+            Fill::default(),
+            Brush::Solid(AlphaColor::from_rgb8(255, 0, 0)),
+            1f32,
+            Affine::IDENTITY,
+            None,
+            glyphs.into_iter(),
         );
     }
 
@@ -202,18 +184,30 @@ impl ApplicationHandler for App {
                 renderer.set_size(self.width, self.height);
                 self.request_redraw();
             }
-            WindowEvent::RedrawRequested => match renderer {
-                Renderer::Skia(r) => {
-                    r.render(|p| App::draw_scene(p, Color::from_rgb8(128, 128, 128)))
+            WindowEvent::RedrawRequested => {
+                let font_data = self.font_data.clone();
+
+                match renderer {
+                    Renderer::Skia(r) => {
+                        r.render(|p| App::draw_scene(p, Color::from_rgb8(128, 128, 128), font_data))
+                    }
+                    Renderer::Null(r) => {
+                        r.render(|p| App::draw_scene(p, Color::from_rgb8(0, 0, 0), font_data))
+                    }
                 }
-                Renderer::Gpu(r) => r.render(|p| App::draw_scene(p, Color::from_rgb8(255, 0, 0))),
-                Renderer::Hybrid(r) => r.render(|p| App::draw_scene(p, Color::from_rgb8(0, 0, 0))),
-                Renderer::Cpu(r) => r.render(|p| App::draw_scene(p, Color::from_rgb8(0, 255, 0))),
-                Renderer::CpuSoftbuffer(r) => {
-                    r.render(|p| App::draw_scene(p, Color::from_rgb8(0, 0, 255)))
+            }
+            WindowEvent::CursorMoved { .. } => {
+                let font_data = self.font_data.clone();
+
+                match renderer {
+                    Renderer::Skia(r) => {
+                        r.render(|p| App::draw_scene(p, Color::from_rgb8(128, 128, 128), font_data))
+                    }
+                    Renderer::Null(r) => {
+                        r.render(|p| App::draw_scene(p, Color::from_rgb8(0, 0, 0), font_data))
+                    }
                 }
-                Renderer::Null(r) => r.render(|p| App::draw_scene(p, Color::from_rgb8(0, 0, 0))),
-            },
+            }
             WindowEvent::KeyboardInput {
                 event:
                     KeyEvent {
@@ -223,20 +217,11 @@ impl ApplicationHandler for App {
                     },
                 ..
             } => match renderer {
-                Renderer::Cpu(_) | Renderer::CpuSoftbuffer(_) => {
-                    self.set_backend(VelloHybridWindowRenderer::new(), event_loop);
-                }
-                Renderer::Hybrid(_) => {
-                    self.set_backend(VelloWindowRenderer::new(), event_loop);
-                }
-                Renderer::Gpu(_) => {
-                    self.set_backend(SkiaWindowRenderer::new(), event_loop);
-                }
                 Renderer::Skia(_) => {
                     self.set_backend(NullWindowRenderer::new(), event_loop);
                 }
                 Renderer::Null(_) => {
-                    self.set_backend(VelloCpuWindowRenderer::new(), event_loop);
+                    self.set_backend(SkiaWindowRenderer::new(), event_loop);
                 }
             },
             _ => {}
@@ -249,6 +234,7 @@ fn main() {
         render_state: RenderState::Suspended(None),
         width: 800,
         height: 600,
+        font_data: FontData::new(Blob::new(Arc::new(include_bytes!("../font.ttf"))), 0),
     };
 
     let event_loop = EventLoop::new().unwrap();
