@@ -49,7 +49,8 @@ where
         self.current_generation = self.current_generation.wrapping_add(1);
     }
 
-    pub(crate) fn contains_key<Q>(&self, key: &Q) -> bool
+    #[allow(unused)]
+    pub(crate) fn contains_key<Q>(&mut self, key: &Q) -> bool
     where
         Q: Hash + Equivalent<K> + ?Sized,
     {

@@ -73,17 +73,23 @@ impl SkiaScenePainter<'_> {
     }
 
     fn set_matrix(&self, transform: kurbo::Affine) {
-        self.inner
-            .set_matrix(&sk_kurbo::matrix_from_affine(transform).into());
+        self.inner.set_matrix(&sk_kurbo::m44_from_affine(transform));
     }
 
     fn concat_matrix(&self, transform: kurbo::Affine) {
         self.inner.concat(&sk_kurbo::matrix_from_affine(transform));
     }
 
-    fn clip(&self, clip: &impl kurbo::Shape) {
-        self.inner
-            .clip_path(&sk_kurbo::path_from_shape(clip), None, true);
+    fn clip(&self, shape: &impl kurbo::Shape) {
+        if let Some(rect) = shape.as_rect() {
+            self.inner.clip_rect(sk_kurbo::rect_from(rect), None, true);
+        } else if let Some(rrect) = shape.as_rounded_rect() {
+            self.inner
+                .clip_rrect(sk_kurbo::rrect_from(rrect), None, true);
+        } else {
+            self.inner
+                .clip_path(&sk_kurbo::path_from_shape(shape), None, true);
+        }
     }
 
     fn set_paint_brush<'a>(
@@ -157,32 +163,11 @@ impl SkiaScenePainter<'_> {
         fill: impl Into<Option<peniko::Fill>>,
     ) {
         if let Some(rect) = shape.as_rect() {
-            self.inner.draw_rect(
-                Rect::new(
-                    rect.x0 as f32,
-                    rect.y0 as f32,
-                    rect.x1 as f32,
-                    rect.y1 as f32,
-                ),
-                &self.cache.paint,
-            );
+            self.inner
+                .draw_rect(sk_kurbo::rect_from(rect), &self.cache.paint);
         } else if let Some(rrect) = shape.as_rounded_rect() {
-            let rect = Rect::new(
-                rrect.rect().x0 as f32,
-                rrect.rect().y0 as f32,
-                rrect.rect().x1 as f32,
-                rrect.rect().y1 as f32,
-            );
-            self.inner.draw_rrect(
-                RRect::new_nine_patch(
-                    rect,
-                    rrect.radii().bottom_left as f32,
-                    rrect.radii().top_left as f32,
-                    rrect.radii().top_right as f32,
-                    rrect.radii().bottom_right as f32,
-                ),
-                &self.cache.paint,
-            );
+            self.inner
+                .draw_rrect(sk_kurbo::rrect_from(rrect), &self.cache.paint);
         } else if let Some(line) = shape.as_line() {
             self.inner.draw_line(
                 (line.p0.x as f32, line.p0.y as f32),
@@ -195,12 +180,6 @@ impl SkiaScenePainter<'_> {
                 circle.radius as f32,
                 &self.cache.paint,
             );
-        } else if let Some(path_els) = shape.as_path_slice() {
-            let mut path = sk_kurbo::path_from_path_elements(path_els);
-            if let Some(fill) = fill.into() {
-                path.set_fill_type(sk_peniko::path_fill_type_from_fill(fill));
-            }
-            self.inner.draw_path(&path, &self.cache.paint);
         } else {
             let mut path = sk_kurbo::path_from_shape(shape);
             if let Some(fill) = fill.into() {
@@ -208,6 +187,178 @@ impl SkiaScenePainter<'_> {
             }
             self.inner.draw_path(&path, &self.cache.paint);
         }
+    }
+
+    fn get_or_cache_font(
+        &mut self,
+        font: &peniko::FontData,
+        normalized_coords: &[anyrender::NormalizedCoord],
+        font_size: f32,
+        hint: bool,
+    ) -> Option<Font> {
+        let cache_key_borrowed = FontCacheKeyBorrowed {
+            typeface_id: font.data.id(),
+            typeface_index: font.index,
+            normalized_coords,
+            font_size: font_size.to_bits(),
+            hint,
+        };
+
+        if let Some(cached) = self.cache.font.hit(&cache_key_borrowed) {
+            return Some(cached.clone());
+        }
+
+        let typeface = self.get_or_cache_normalized_typeface(font, normalized_coords)?;
+
+        let cache_key = FontCacheKey {
+            typeface_id: font.data.id(),
+            typeface_index: font.index,
+            normalized_coords: normalized_coords.to_vec(),
+            font_size: font_size.to_bits(),
+            hint,
+        };
+
+        let mut font = Font::from_typeface(typeface, font_size);
+        font.set_hinting(if hint {
+            FontHinting::Normal
+        } else {
+            FontHinting::None
+        });
+        font.set_edging(Edging::SubpixelAntiAlias);
+
+        self.cache.font.insert(cache_key, font.clone());
+
+        Some(font)
+    }
+
+    fn get_or_cache_normalized_typeface(
+        &mut self,
+        font: &peniko::FontData,
+        normalized_coords: &[anyrender::NormalizedCoord],
+    ) -> Option<Typeface> {
+        fn f2dot14_to_f32(raw_value: i16) -> f32 {
+            let int = (raw_value >> 14) as f32;
+            let fract = (raw_value & !(!0 << 14)) as f32 / (1 << 14) as f32;
+            int + fract
+        }
+
+        if normalized_coords.is_empty() {
+            return self.get_or_cache_typeface(font);
+        }
+
+        let cache_key_borrowed = NormalizedTypefaceCacheKeyBorrowed {
+            typeface_id: font.data.id(),
+            typeface_index: font.index,
+            normalized_coords,
+        };
+
+        if let Some(cached) = self.cache.normalized_typeface.hit(&cache_key_borrowed) {
+            return Some(cached.clone());
+        }
+
+        let typeface = self.get_or_cache_typeface(font)?;
+
+        let axes = typeface.variation_design_parameters().unwrap_or_default();
+
+        if axes.is_empty() {
+            return Some(typeface);
+        }
+
+        let coordinates: Vec<Coordinate> = axes
+            .iter()
+            .zip(normalized_coords.iter().map(|c| f2dot14_to_f32(*c)))
+            .filter(|(_, value)| *value != 0.0)
+            .map(|(axis, factor)| {
+                let value = if factor < 0.0 {
+                    lerp_f32(axis.min, axis.def, -factor)
+                } else {
+                    lerp_f32(axis.def, axis.max, factor)
+                };
+
+                Coordinate {
+                    axis: axis.tag,
+                    value,
+                }
+            })
+            .collect();
+        let variation_position = VariationPosition {
+            coordinates: &coordinates,
+        };
+
+        let normalized_typeface = typeface
+            .clone_with_arguments(
+                &FontArguments::new().set_variation_design_position(variation_position),
+            )
+            .unwrap();
+
+        self.cache.normalized_typeface.insert(
+            NormalizedTypefaceCacheKey {
+                typeface_id: font.data.id(),
+                typeface_index: font.index,
+                normalized_coords: normalized_coords.to_vec(),
+            },
+            normalized_typeface.clone(),
+        );
+
+        Some(normalized_typeface)
+    }
+
+    fn get_or_cache_typeface<'a>(
+        &'a mut self,
+        #[allow(unused_mut)] mut font: &'a peniko::FontData,
+    ) -> Option<Typeface> {
+        let cache_key = (font.data.id(), font.index);
+
+        #[cfg(target_os = "macos")]
+        #[allow(clippy::map_entry, reason = "Cannot early-return with entry API")]
+        {
+            use peniko::Blob;
+            use std::sync::Arc;
+
+            if let Some(collection) = oaty::Collection::new(font.data.data()) {
+                if !self.cache.extracted_font_data.contains_key(&cache_key) {
+                    let Some(data) = collection
+                        .get_font(font.index)
+                        .and_then(|font| font.copy_data())
+                    else {
+                        eprintln!(
+                            "WARNING: failed to extract font {} {}",
+                            cache_key.0, cache_key.1
+                        );
+                        return None;
+                    };
+
+                    let blob = Blob::new(Arc::new(data));
+                    let font_data = peniko::FontData::new(blob, 0);
+                    self.cache.extracted_font_data.insert(cache_key, font_data);
+                }
+                font = self.cache.extracted_font_data.hit(&cache_key).unwrap()
+            }
+        }
+
+        if let Some(cached) = self.cache.typeface.hit(&cache_key) {
+            return Some(cached.clone());
+        }
+
+        let Some(typeface) = self
+            .cache
+            .font_mgr
+            .new_from_data(font.data.data(), font.index as usize)
+        else {
+            let tf = Typeface::make_deserialize(font.data.data(), None);
+            eprintln!(
+                "WARNING: failed to load font {} {} {} {}",
+                cache_key.0,
+                cache_key.1,
+                tf.is_some(),
+                font.index
+            );
+            return None;
+        };
+
+        self.cache.typeface.insert(cache_key, typeface.clone());
+
+        Some(typeface)
     }
 }
 
@@ -223,6 +374,8 @@ impl PaintScene for SkiaScenePainter<'_> {
         transform: kurbo::Affine,
         clip: &impl kurbo::Shape,
     ) {
+        let blend: peniko::BlendMode = blend.into();
+
         self.reset_paint();
         self.set_paint_alpha(alpha);
         self.set_paint_blend_mode(blend);
@@ -232,8 +385,13 @@ impl PaintScene for SkiaScenePainter<'_> {
         self.set_matrix(transform);
         self.clip(clip);
 
-        self.inner
-            .save_layer(&SaveLayerRec::default().paint(&self.cache.paint));
+        #[allow(deprecated)] // Mix::Clip
+        if blend.mix == peniko::Mix::Clip && alpha == 1f32 {
+            self.inner.save();
+        } else {
+            self.inner
+                .save_layer(&SaveLayerRec::default().paint(&self.cache.paint));
+        }
     }
 
     fn pop_layer(&mut self) {
@@ -297,156 +455,9 @@ impl PaintScene for SkiaScenePainter<'_> {
         self.set_paint_style(style);
         self.set_paint_alpha(brush_alpha);
 
-        let font_key = (font.data.id(), font.index);
-
-        #[cfg(target_os = "macos")]
-        #[allow(clippy::map_entry, reason = "Cannot early-return with entry API")]
-        {
-            use peniko::Blob;
-            use std::sync::Arc;
-
-            if let Some(collection) = oaty::Collection::new(font.data.data()) {
-                if !self.cache.extracted_font_data.contains_key(&font_key) {
-                    let Some(data) = collection
-                        .get_font(font.index)
-                        .and_then(|font| font.copy_data())
-                    else {
-                        eprintln!(
-                            "WARNING: failed to extract font {} {}",
-                            font_key.0, font_key.1
-                        );
-                        return;
-                    };
-
-                    let blob = Blob::new(Arc::new(data));
-                    let font_data = peniko::FontData::new(blob, 0);
-                    self.cache.extracted_font_data.insert(font_key, font_data);
-                }
-                font = self.cache.extracted_font_data.hit(&font_key).unwrap()
-            }
-        }
-
-        if !self.cache.typeface.contains_key(&font_key) {
-            let Some(typeface) = self
-                .cache
-                .font_mgr
-                .new_from_data(font.data.data(), font.index as usize)
-            else {
-                let tf = Typeface::make_deserialize(font.data.data(), None);
-                eprintln!(
-                    "WARNING: failed to load font {} {} {} {}",
-                    font_key.0,
-                    font_key.1,
-                    tf.is_some(),
-                    font.index
-                );
-                return;
-            };
-            self.cache.typeface.insert(font_key, typeface);
-        }
-
-        let original_typeface: &Typeface = self.cache.typeface.hit(&font_key).unwrap();
-        let mut normalized_typeface: Option<&Typeface> = None;
-
-        fn f2dot14_to_f32(raw_value: i16) -> f32 {
-            let int = (raw_value >> 14) as f32;
-            let fract = (raw_value & !(!0 << 14)) as f32 / (1 << 14) as f32;
-            int + fract
-        }
-
-        if !normalized_coords.is_empty() {
-            let axes = original_typeface
-                .variation_design_parameters()
-                .unwrap_or_default();
-            if !axes.is_empty() {
-                let normalized_typeface_cache_key_borrowed = NormalizedTypefaceCacheKeyBorrowed {
-                    typeface_id: font.data.id(),
-                    typeface_index: font.index,
-                    normalized_coords,
-                };
-
-                if !self
-                    .cache
-                    .normalized_typeface
-                    .contains_key(&normalized_typeface_cache_key_borrowed)
-                {
-                    let coordinates: Vec<Coordinate> = axes
-                        .iter()
-                        .zip(normalized_coords.iter().map(|c| f2dot14_to_f32(*c)))
-                        .filter(|(_, value)| *value != 0.0)
-                        .map(|(axis, factor)| {
-                            let value = if factor < 0.0 {
-                                lerp_f32(axis.min, axis.def, -factor)
-                            } else {
-                                lerp_f32(axis.def, axis.max, factor)
-                            };
-
-                            Coordinate {
-                                axis: axis.tag,
-                                value,
-                            }
-                        })
-                        .collect();
-                    let variation_position = VariationPosition {
-                        coordinates: &coordinates,
-                    };
-
-                    self.cache.normalized_typeface.insert(
-                        NormalizedTypefaceCacheKey {
-                            typeface_id: font.data.id(),
-                            typeface_index: font.index,
-                            normalized_coords: normalized_coords.to_vec(),
-                        },
-                        original_typeface
-                            .clone_with_arguments(
-                                &FontArguments::new()
-                                    .set_variation_design_position(variation_position),
-                            )
-                            .unwrap(),
-                    );
-                }
-
-                normalized_typeface = Some(
-                    self.cache
-                        .normalized_typeface
-                        .hit(&normalized_typeface_cache_key_borrowed)
-                        .unwrap(),
-                )
-            }
-        }
-
-        let typeface: &Typeface = normalized_typeface.unwrap_or(original_typeface);
-
-        let font_cache_key_borrowed = FontCacheKeyBorrowed {
-            typeface_id: font.data.id(),
-            typeface_index: font.index,
-            normalized_coords,
-            font_size: font_size.to_bits(),
-            hint,
+        let Some(font) = self.get_or_cache_font(font, normalized_coords, font_size, hint) else {
+            return;
         };
-
-        if !self.cache.font.contains_key(&font_cache_key_borrowed) {
-            let mut font_to_cache = Font::from_typeface(typeface, font_size);
-            font_to_cache.set_hinting(if hint {
-                FontHinting::Normal
-            } else {
-                FontHinting::None
-            });
-            font_to_cache.set_edging(Edging::SubpixelAntiAlias);
-
-            self.cache.font.insert(
-                FontCacheKey {
-                    typeface_id: font.data.id(),
-                    typeface_index: font.index,
-                    normalized_coords: normalized_coords.to_vec(),
-                    font_size: font_size.to_bits(),
-                    hint,
-                },
-                font_to_cache,
-            );
-        }
-
-        let font = self.cache.font.hit(&font_cache_key_borrowed).unwrap();
 
         let (min_size, _) = glyphs.size_hint();
         self.cache.glyph_id_buf.reserve(min_size);
@@ -461,7 +472,7 @@ impl PaintScene for SkiaScenePainter<'_> {
             &self.cache.glyph_id_buf[..],
             GlyphPositions::Points(&self.cache.glyph_pos_buf[..]),
             Point::new(0.0, 0.0),
-            font,
+            &font,
             &self.cache.paint,
         );
 
@@ -811,11 +822,63 @@ mod sk_peniko {
 }
 
 mod sk_kurbo {
-    use kurbo::Shape;
     use kurbo::{Affine, PathEl, Point};
+    use kurbo::{Rect, RoundedRect, Shape};
+    use skia_safe::M44 as SkM44;
     use skia_safe::Matrix as SkMatrix;
     use skia_safe::Path as SkPath;
     use skia_safe::Point as SkPoint;
+    use skia_safe::RRect as SkRRect;
+    use skia_safe::Rect as SkRect;
+
+    pub(super) fn rect_from(rect: Rect) -> SkRect {
+        SkRect::new(
+            rect.x0 as f32,
+            rect.y0 as f32,
+            rect.x1 as f32,
+            rect.y1 as f32,
+        )
+    }
+
+    pub(super) fn rrect_from(rrect: RoundedRect) -> SkRRect {
+        let rect = rect_from(rrect.rect());
+        SkRRect::new_nine_patch(
+            rect,
+            rrect.radii().bottom_left as f32,
+            rrect.radii().top_left as f32,
+            rrect.radii().top_right as f32,
+            rrect.radii().bottom_right as f32,
+        )
+    }
+
+    pub(super) fn m44_from_affine(affine: Affine) -> SkM44 {
+        let m = affine.as_coeffs();
+        let scale_x = m[0] as f32;
+        let shear_y = m[1] as f32;
+        let shear_x = m[2] as f32;
+        let scale_y = m[3] as f32;
+        let translate_x = m[4] as f32;
+        let translate_y = m[5] as f32;
+
+        SkM44::col_major(&[
+            scale_x,
+            shear_y,
+            0.0,
+            0.0,
+            shear_x,
+            scale_y,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            translate_x,
+            translate_y,
+            0.0,
+            1.0,
+        ])
+    }
 
     pub(super) fn matrix_from_affine(affine: Affine) -> SkMatrix {
         let m = affine.as_coeffs();
@@ -846,18 +909,14 @@ mod sk_kurbo {
     pub(super) fn path_from_shape(shape: &impl Shape) -> SkPath {
         let mut sk_path = SkPath::new();
 
-        for path_el in shape.path_elements(0.1) {
-            append_path_el_to_sk_path(&path_el, &mut sk_path);
-        }
-
-        sk_path
-    }
-
-    pub(super) fn path_from_path_elements(path: &[PathEl]) -> SkPath {
-        let mut sk_path = SkPath::new();
-
-        for path_el in path {
-            append_path_el_to_sk_path(path_el, &mut sk_path);
+        if let Some(path_els) = shape.as_path_slice() {
+            for path_el in path_els {
+                append_path_el_to_sk_path(path_el, &mut sk_path);
+            }
+        } else {
+            for path_el in shape.path_elements(0.1) {
+                append_path_el_to_sk_path(&path_el, &mut sk_path);
+            }
         }
 
         sk_path
