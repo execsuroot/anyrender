@@ -114,7 +114,7 @@ impl Equivalent<NormalizedTypefaceCacheKey> for NormalizedTypefaceCacheKeyBorrow
     fn equivalent(&self, key: &NormalizedTypefaceCacheKey) -> bool {
         self.typeface_id == key.typeface_id
             && self.typeface_index == key.typeface_index
-            && self.normalized_coords == &key.normalized_coords
+            && self.normalized_coords == key.normalized_coords
     }
 }
 
@@ -165,6 +165,6 @@ impl Equivalent<FontCacheKey> for FontCacheKeyBorrowed<'_> {
             && self.typeface_index == key.typeface_index
             && self.font_size == key.font_size
             && self.hint == key.hint
-            && self.normalized_coords == &key.normalized_coords
+            && self.normalized_coords == key.normalized_coords
     }
 }

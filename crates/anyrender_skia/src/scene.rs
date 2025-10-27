@@ -457,7 +457,7 @@ impl PaintScene for SkiaScenePainter<'_> {
             &self.cache.glyph_id_buf[..],
             GlyphPositions::Points(&self.cache.glyph_pos_buf[..]),
             Point::new(0.0, 0.0),
-            &font,
+            font,
             &self.cache.paint,
         );
 
