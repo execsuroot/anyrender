@@ -10,7 +10,7 @@ use skia_safe::{
     gpu::{self, DirectContext, SurfaceOrigin, backend_render_targets, mtl},
     scalar,
 };
-use tracing::{instrument, Level};
+use tracing::{Level, instrument};
 
 use crate::window_renderer::SkiaBackend;
 

@@ -7,7 +7,7 @@ use skia_safe::{
     font::Edging,
     font_arguments::{VariationPosition, variation_position::Coordinate},
 };
-use tracing::{instrument, Level};
+use tracing::{Level, instrument};
 
 use crate::cache::{
     FontCacheKey, FontCacheKeyBorrowed, GenerationalCache, NormalizedTypefaceCacheKey,
@@ -247,8 +247,6 @@ impl PaintScene for SkiaScenePainter<'_> {
 
         self.inner
             .save_layer(&SaveLayerRec::default().paint(&self.cache.paint));
-
-
     }
 
     #[instrument(skip_all, level = Level::INFO)]

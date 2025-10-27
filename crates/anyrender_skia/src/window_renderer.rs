@@ -4,7 +4,7 @@ use skia_safe::{Color, Surface};
 use std::sync::Arc;
 use tracing_subscriber::layer::SubscriberExt;
 
-use crate::{profiler, scene::SkiaSceneCache, SkiaScenePainter};
+use crate::{SkiaScenePainter, profiler, scene::SkiaSceneCache};
 
 pub(crate) trait SkiaBackend {
     fn set_size(&mut self, width: u32, height: u32);

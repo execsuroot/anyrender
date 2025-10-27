@@ -1,7 +1,7 @@
 mod image_renderer;
+mod profiler;
 mod scene;
 mod window_renderer;
-mod profiler;
 
 // Backends
 mod cache;
