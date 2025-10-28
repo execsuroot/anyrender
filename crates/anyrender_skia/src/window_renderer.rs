@@ -1,6 +1,6 @@
 use anyrender::WindowRenderer;
 use debug_timer::debug_timer;
-use skia_safe::{Color, Surface};
+use skia_safe::{Color, Surface, graphics};
 use std::sync::Arc;
 
 use crate::{SkiaScenePainter, scene::SkiaSceneCache};
@@ -50,6 +50,10 @@ impl WindowRenderer for SkiaWindowRenderer {
         Self: 'a;
 
     fn resume(&mut self, window: Arc<dyn anyrender::WindowHandle>, width: u32, height: u32) {
+        graphics::set_font_cache_count_limit(100);
+        graphics::set_typeface_cache_count_limit(100);
+        graphics::set_resource_cache_total_bytes_limit(10485760);
+
         #[cfg(target_os = "macos")]
         let backend = crate::metal::MetalBackend::new(window, width, height);
         #[cfg(not(target_os = "macos"))]
