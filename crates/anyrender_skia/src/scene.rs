@@ -39,11 +39,11 @@ impl Default for SkiaSceneCache {
         Self {
             paint: Paint::default(),
             #[cfg(target_os = "macos")]
-            extracted_font_data: GenerationalCache::new(1),
-            typeface: GenerationalCache::new(60), // Keep this high until we figure out a fix for skia_safe fontmgr cache leak
-            normalized_typeface: GenerationalCache::new(60), // Keep this high until we figure out a fix for skia_safe fontmgr cache leak
+            extracted_font_data: GenerationalCache::new(10),
+            typeface: GenerationalCache::new(1),
+            normalized_typeface: GenerationalCache::new(1),
             image_shader: GenerationalCache::new(1),
-            font: GenerationalCache::new(60), // Keep this high until we figure out a fix for skia_safe fontmgr cache leak
+            font: GenerationalCache::new(1),
             font_mgr: FontMgr::new(),
             glyph_id_buf: Default::default(),
             glyph_pos_buf: Default::default(),
