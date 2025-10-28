@@ -33,7 +33,6 @@ use skia_safe::{
 use std::{
     ffi::{CStr, CString},
     sync::Arc,
-    u64,
 };
 
 use crate::window_renderer::SkiaBackend;
@@ -53,6 +52,8 @@ pub(crate) struct VulkanBackend {
     swapchain_format: Format,
     swapchain_extent: Extent2D,
     swapchain_image_index: u32,
+    swapchain_suboptimal: bool,
+    swapchain_size: (u32, u32),
     gr_context: DirectContext,
     image_available_semaphore: Semaphore,
     render_finished_semaphore: Semaphore,
@@ -88,6 +89,8 @@ impl VulkanBackend {
         let (device, queue) = create_logical_device(&instance, physical_device, queue_family_index);
         let device = Arc::new(device);
 
+        let swapchain_size = (width, height);
+
         let (swapchain, swapchain_fns, swapchain_images, swapchain_format, swapchain_extent) =
             create_swapchain(
                 &instance,
@@ -96,8 +99,7 @@ impl VulkanBackend {
                 &surface_fns,
                 surface,
                 queue_family_index,
-                width,
-                height,
+                swapchain_size,
                 None,
             );
 
@@ -151,12 +153,44 @@ impl VulkanBackend {
             swapchain_format,
             swapchain_extent,
             swapchain_image_index: 0,
+            swapchain_suboptimal: false,
+            swapchain_size,
             gr_context,
             image_available_semaphore,
             render_finished_semaphore,
             in_flight_fence,
             cmd_pool,
             cmd_buf,
+        }
+    }
+
+    fn recreate_swapchain(&mut self) {
+        unsafe {
+            self.device.device_wait_idle().unwrap();
+        }
+
+        let old_swapchain = self.swapchain;
+
+        let (swapchain, swapchain_fns, swapchain_images, swapchain_format, swapchain_extent) =
+            create_swapchain(
+                &self.instance,
+                &self.device,
+                self.physical_device,
+                &self.surface_fns,
+                self.surface,
+                self.queue_family_index,
+                self.swapchain_size,
+                Some(old_swapchain),
+            );
+        self.swapchain = swapchain;
+        self.swapchain_fns = swapchain_fns;
+        self.swapchain_images = swapchain_images;
+        self.swapchain_format = swapchain_format;
+        self.swapchain_extent = swapchain_extent;
+        self.swapchain_suboptimal = false;
+
+        unsafe {
+            self.swapchain_fns.destroy_swapchain(old_swapchain, None);
         }
     }
 }
@@ -189,31 +223,8 @@ impl Drop for VulkanBackend {
 
 impl SkiaBackend for VulkanBackend {
     fn set_size(&mut self, width: u32, height: u32) {
-        unsafe {
-            self.device.device_wait_idle().unwrap();
-
-            let old_swapchain = self.swapchain;
-
-            let (swapchain, swapchain_fns, swapchain_images, swapchain_format, swapchain_extent) =
-                create_swapchain(
-                    &self.instance,
-                    &self.device,
-                    self.physical_device,
-                    &self.surface_fns,
-                    self.surface,
-                    self.queue_family_index,
-                    width,
-                    height,
-                    Some(old_swapchain),
-                );
-            self.swapchain = swapchain;
-            self.swapchain_fns = swapchain_fns;
-            self.swapchain_images = swapchain_images;
-            self.swapchain_format = swapchain_format;
-            self.swapchain_extent = swapchain_extent;
-
-            self.swapchain_fns.destroy_swapchain(old_swapchain, None);
-        }
+        self.swapchain_size = (width, height);
+        self.recreate_swapchain();
     }
 
     fn prepare(&mut self) -> Option<Surface> {
@@ -224,7 +235,7 @@ impl SkiaBackend for VulkanBackend {
 
             self.device.reset_fences(&[self.in_flight_fence]).unwrap();
 
-            let (image_index, _) = self
+            let (image_index, suboptimal) = self
                 .swapchain_fns
                 .acquire_next_image(
                     self.swapchain,
@@ -235,6 +246,7 @@ impl SkiaBackend for VulkanBackend {
                 .unwrap();
 
             self.swapchain_image_index = image_index;
+            self.swapchain_suboptimal = suboptimal;
 
             let image = self.swapchain_images[image_index as usize];
 
@@ -341,6 +353,10 @@ impl SkiaBackend for VulkanBackend {
         };
 
         drop(surface);
+
+        if self.swapchain_suboptimal {
+            self.recreate_swapchain();
+        }
     }
 }
 
@@ -453,8 +469,7 @@ fn create_swapchain(
     surface_fns: &InstanceSurfaceFns,
     surface: SurfaceKHR,
     queue_family_index: u32,
-    width: u32,
-    height: u32,
+    size: (u32, u32),
     old_swapchain: Option<SwapchainKHR>,
 ) -> (
     SwapchainKHR,
@@ -494,7 +509,10 @@ fn create_swapchain(
         .find(|&m| m == PresentModeKHR::MAILBOX)
         .unwrap_or(PresentModeKHR::FIFO);
 
-    let extent = Extent2D { width, height };
+    let extent = Extent2D {
+        width: size.0,
+        height: size.1,
+    };
     let image_count = surface_caps.min_image_count.max(2);
 
     let create_info = SwapchainCreateInfoKHR::default()
@@ -518,7 +536,7 @@ fn create_swapchain(
         .clipped(true)
         .old_swapchain(old_swapchain.unwrap_or(SwapchainKHR::null()));
 
-    let swapchain_fns = DeviceSwapchainFns::new(&instance, &device);
+    let swapchain_fns = DeviceSwapchainFns::new(instance, device);
     let swapchain = unsafe { swapchain_fns.create_swapchain(&create_info, None).unwrap() };
     let images = unsafe { swapchain_fns.get_swapchain_images(swapchain).unwrap() };
 
