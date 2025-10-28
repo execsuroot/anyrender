@@ -346,15 +346,13 @@ impl SkiaBackend for VulkanBackend {
             .swapchains(&swapchains)
             .image_indices(&image_indices);
 
-        unsafe {
-            self.swapchain_fns
-                .queue_present(self.queue, &present_info)
-                .unwrap();
-        };
+        let result = unsafe { self.swapchain_fns.queue_present(self.queue, &present_info) };
 
         drop(surface);
 
-        if self.swapchain_suboptimal {
+        if self.swapchain_suboptimal
+            || matches!(result, Err(ash::vk::Result::ERROR_OUT_OF_DATE_KHR))
+        {
             self.recreate_swapchain();
         }
     }
@@ -509,10 +507,21 @@ fn create_swapchain(
         .find(|&m| m == PresentModeKHR::MAILBOX)
         .unwrap_or(PresentModeKHR::FIFO);
 
-    let extent = Extent2D {
-        width: size.0,
-        height: size.1,
+    let extent = if surface_caps.current_extent.width == u32::MAX {
+        Extent2D {
+            width: size
+                .0
+                .max(surface_caps.min_image_extent.width)
+                .min(surface_caps.max_image_extent.width),
+            height: size
+                .1
+                .max(surface_caps.min_image_extent.height)
+                .min(surface_caps.max_image_extent.height),
+        }
+    } else {
+        surface_caps.current_extent
     };
+
     let image_count = surface_caps.min_image_count.max(2);
 
     let create_info = SwapchainCreateInfoKHR::default()
