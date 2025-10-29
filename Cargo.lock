@@ -116,8 +116,10 @@ dependencies = [
  "objc2-metal 0.3.2",
  "objc2-quartz-core 0.3.2",
  "peniko",
+ "pixels_window_renderer",
  "raw-window-handle",
  "skia-safe",
+ "softbuffer_window_renderer",
 ]
 
 [[package]]

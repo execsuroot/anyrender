@@ -11,6 +11,6 @@ mod opengl;
 #[cfg(feature = "vulkan")]
 mod vulkan;
 
-pub use scene::SkiaScenePainter;
 pub use image_renderer::SkiaImageRenderer;
+pub use scene::SkiaScenePainter;
 pub use window_renderer::*;
