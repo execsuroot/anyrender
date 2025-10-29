@@ -12,4 +12,5 @@ mod opengl;
 mod vulkan;
 
 pub use scene::SkiaScenePainter;
-pub use window_renderer::SkiaWindowRenderer;
+pub use image_renderer::SkiaImageRenderer;
+pub use window_renderer::*;

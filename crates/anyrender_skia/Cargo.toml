@@ -9,7 +9,9 @@ license.workspace = true
 edition.workspace = true
 
 [features]
-log_frame_times = ["debug_timer/enable"]
+pixels_window_renderer = ["dep:pixels_window_renderer"]
+softbuffer_window_renderer = ["dep:softbuffer_window_renderer"]
+log_frame_times = ["debug_timer/enable", "pixels_window_renderer?/log_frame_times", "softbuffer_window_renderer?/log_frame_times"]
 vulkan = ["skia-safe/vulkan"]
 
 [dependencies]
@@ -21,6 +23,8 @@ raw-window-handle = { workspace = true }
 futures-intrusive = { workspace = true }
 pollster = { workspace = true }
 rustc-hash = { workspace = true }
+softbuffer_window_renderer = { workspace = true, optional = true }
+pixels_window_renderer = { workspace = true, optional = true }
 skia-safe = { version = "0.89.1", features = ["gl", "pdf", "textlayout"]}
 oaty = "0.1"
 gl = "0.14.0"
