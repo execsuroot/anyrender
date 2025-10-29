@@ -1,6 +1,6 @@
 use anyrender::ImageRenderer;
 use debug_timer::debug_timer;
-use skia_safe::{AlphaType, Color, ColorType, ImageInfo, SurfaceProps, surfaces};
+use skia_safe::{AlphaType, Color, ColorType, ImageInfo, SurfaceProps, graphics, surfaces};
 
 use crate::{SkiaScenePainter, scene::SkiaSceneCache};
 
@@ -17,6 +17,10 @@ impl ImageRenderer for SkiaImageRenderer {
         Self: 'a;
 
     fn new(width: u32, height: u32) -> Self {
+        graphics::set_font_cache_count_limit(100);
+        graphics::set_typeface_cache_count_limit(100);
+        graphics::set_resource_cache_total_bytes_limit(10485760);
+
         Self {
             image_info: ImageInfo::new(
                 (width as i32, height as i32),
@@ -63,6 +67,9 @@ impl ImageRenderer for SkiaImageRenderer {
         });
         timer.record_time("render");
 
+        self.scene_cache.next_gen();
+        timer.record_time("cache next gen");
+
         timer.print_times("skia_raster: ");
     }
 
@@ -84,6 +91,9 @@ impl ImageRenderer for SkiaImageRenderer {
             cache: &mut self.scene_cache,
         });
         timer.record_time("render");
+
+        self.scene_cache.next_gen();
+        timer.record_time("cache next gen");
 
         timer.print_times("skia_raster: ");
     }

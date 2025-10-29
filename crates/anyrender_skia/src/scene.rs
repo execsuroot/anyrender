@@ -43,7 +43,7 @@ impl Default for SkiaSceneCache {
             typeface: GenerationalCache::new(1),
             normalized_typeface: GenerationalCache::new(1),
             image_shader: GenerationalCache::new(1),
-            font: GenerationalCache::new(1),
+            font: GenerationalCache::new(10),
             font_mgr: FontMgr::new(),
             glyph_id_buf: Default::default(),
             glyph_pos_buf: Default::default(),
