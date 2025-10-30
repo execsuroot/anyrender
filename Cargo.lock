@@ -90,7 +90,7 @@ dependencies = [
 
 [[package]]
 name = "anyrender"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "kurbo 0.12.0",
  "peniko",
@@ -99,7 +99,7 @@ dependencies = [
 
 [[package]]
 name = "anyrender_skia"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "anyrender",
  "ash 0.38.0+1.3.281",
@@ -136,7 +136,7 @@ dependencies = [
 
 [[package]]
 name = "anyrender_vello"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "anyrender",
  "debug_timer",
@@ -151,7 +151,7 @@ dependencies = [
 
 [[package]]
 name = "anyrender_vello_cpu"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "anyrender",
  "debug_timer",
@@ -164,7 +164,7 @@ dependencies = [
 
 [[package]]
 name = "anyrender_vello_hybrid"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyrender",
  "debug_timer",
